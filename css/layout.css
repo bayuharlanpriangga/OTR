@@ -1,0 +1,208 @@
+/* ==========================================================================
+   OTR — Layout: App Shell
+   Desktop: sidebar kiri + topbar + content.
+   Mobile: topbar + content + bottom nav (sidebar disembunyikan).
+   ========================================================================== */
+
+#app-shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) 1fr;
+  grid-template-rows: 1fr;
+  min-height: 100svh;
+}
+
+/* ---- Sidebar (desktop) ---- */
+.sidebar {
+  grid-row: 1 / -1;
+  border-right: 1px solid var(--otr-hairline);
+  background: var(--otr-obsidian-2);
+  padding: var(--space-5) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  overflow-y: auto;
+}
+
+.sidebar__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-2);
+}
+
+.sidebar__brand-mark {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(155deg, var(--otr-gold) 0%, var(--otr-oxblood) 130%);
+  flex-shrink: 0;
+}
+
+.sidebar__brand-name {
+  font-family: var(--font-display);
+  font-size: var(--fs-md);
+  letter-spacing: 0.02em;
+}
+
+.sidebar__nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.sidebar__link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--otr-mist);
+  font-size: var(--fs-sm);
+  transition: background var(--duration-fast) var(--ease-standard),
+              color var(--duration-fast) var(--ease-standard);
+}
+
+.sidebar__link:hover {
+  background: var(--otr-plum);
+  color: var(--otr-parchment);
+}
+
+.sidebar__link.is-active {
+  background: var(--otr-plum);
+  color: var(--otr-gold);
+}
+
+.sidebar__link-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.sidebar__footer {
+  margin-top: auto;
+  padding: 0 var(--space-2);
+}
+
+/* ---- Main column ---- */
+.app-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* ---- Topbar ---- */
+.topbar {
+  height: var(--topbar-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-6);
+  border-bottom: 1px solid var(--otr-hairline);
+  position: sticky;
+  top: 0;
+  background: rgba(20, 17, 28, 0.88);
+  backdrop-filter: blur(8px);
+  z-index: var(--z-nav);
+}
+
+.topbar__title {
+  font-family: var(--font-display);
+  font-size: var(--fs-md);
+}
+
+.topbar__menu-btn {
+  display: none;
+}
+
+/* ---- Content ---- */
+.app-content {
+  flex: 1;
+  width: 100%;
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding: var(--space-6);
+}
+
+/* ---- Bottom nav (mobile) ---- */
+.bottom-nav {
+  display: none;
+}
+
+/* ==========================================================================
+   Responsive
+   ========================================================================== */
+
+@media (max-width: 1024px) {
+  #app-shell {
+    grid-template-columns: var(--sidebar-width-collapsed) 1fr;
+  }
+  .sidebar__brand-name,
+  .sidebar__link-label {
+    display: none;
+  }
+  .sidebar__link {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 768px) {
+  #app-shell {
+    grid-template-columns: 1fr;
+  }
+  .sidebar {
+    display: none;
+  }
+  .topbar {
+    padding: 0 var(--space-4);
+  }
+  .app-content {
+    padding: var(--space-4) var(--space-4) calc(var(--bottom-nav-height) + var(--space-6));
+  }
+  .bottom-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: var(--bottom-nav-height);
+    background: var(--otr-obsidian-2);
+    border-top: 1px solid var(--otr-hairline);
+    z-index: var(--z-nav);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .bottom-nav__link {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    font-size: 10px;
+    color: var(--otr-mist);
+    padding: var(--space-2);
+  }
+  .bottom-nav__link.is-active {
+    color: var(--otr-gold);
+  }
+  .bottom-nav__link-icon {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+/* ---- Utility layout ---- */
+.stack { display: flex; flex-direction: column; }
+.row { display: flex; align-items: center; }
+.gap-2 { gap: var(--space-2); }
+.gap-3 { gap: var(--space-3); }
+.gap-4 { gap: var(--space-4); }
+.gap-6 { gap: var(--space-6); }
+
+.grid-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--space-4);
+}

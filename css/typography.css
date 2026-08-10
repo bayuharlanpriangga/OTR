@@ -1,0 +1,55 @@
+/* ==========================================================================
+   OTR — Typography
+   Display: Fraunces (serif ekspresif, untuk judul & momen bermakna)
+   Body:    Public Sans (netral, mudah dibaca panjang)
+   Mono:    IBM Plex Mono (angka, kode kartu, data statistik)
+   ========================================================================== */
+
+h1, h2, h3, .font-display {
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: var(--lh-tight);
+  letter-spacing: -0.01em;
+  color: var(--otr-parchment);
+}
+
+h1 { font-size: var(--fs-2xl); }
+h2 { font-size: var(--fs-xl); }
+h3 { font-size: var(--fs-lg); }
+
+h1, h2, h3 {
+  font-variant-numeric: oldstyle-nums;
+}
+
+p, li, .font-body {
+  font-family: var(--font-body);
+  font-size: var(--fs-base);
+  line-height: var(--lh-relaxed);
+  color: var(--otr-parchment-dim);
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--otr-gold);
+}
+
+.text-muted {
+  color: var(--otr-mist);
+}
+
+.text-sm {
+  font-size: var(--fs-sm);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 640px) {
+  h1 { font-size: var(--fs-xl); }
+  h2 { font-size: var(--fs-lg); }
+}
