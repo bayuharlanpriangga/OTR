@@ -1,5 +1,213 @@
 /* ==========================================================================
-   OTR — Tarot Card component styles
-   Placeholder — diisi penuh di PHASE 4 (Tarot Card Component).
-   Ratio 2:3 sudah didefinisikan lewat --card-ratio di variables.css.
+   OTR — Tarot Card component styles (Phase 4)
+   Ratio 2:3 via --card-ratio (variables.css). Flip pakai 3D transform murni
+   CSS, tanpa JS animation loop. Semua durasi pakai --duration-* dari
+   variables.css, yang otomatis jadi 0ms di bawah prefers-reduced-motion —
+   jadi flip/hover di sini otomatis "reduced motion safe" tanpa media query
+   tambahan di file ini.
    ========================================================================== */
+
+.tarot-card {
+  position: relative;
+  width: var(--tarot-card-w, clamp(96px, 26vw, 168px));
+  max-width: 100%;
+  aspect-ratio: var(--card-ratio);
+  perspective: 1200px;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ---- Size presets ---- */
+.tarot-card--sm { --tarot-card-w: clamp(64px, 18vw, 96px); }
+.tarot-card--md { --tarot-card-w: clamp(96px, 26vw, 168px); }
+.tarot-card--lg { --tarot-card-w: clamp(140px, 34vw, 240px); }
+
+/* ---- Flip mechanism ---- */
+.tarot-card__inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transform: rotateY(0deg);
+  transition: transform var(--duration-slow) var(--ease-out-soft);
+}
+
+.tarot-card[data-revealed="true"] .tarot-card__inner {
+  transform: rotateY(180deg);
+}
+
+.tarot-card__front,
+.tarot-card__back {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--otr-hairline);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  transition: border-color var(--duration-fast) var(--ease-standard),
+              box-shadow var(--duration-fast) var(--ease-standard);
+}
+
+/* ---- Back face — signature .weave motif, kartu belum ditarik/dibuka ---- */
+.tarot-card__back {
+  background: linear-gradient(160deg, var(--otr-obsidian-2), var(--otr-plum));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tarot-card__back-mark {
+  position: relative;
+  width: 32%;
+  aspect-ratio: 1;
+  border: 1px solid var(--otr-gold-dim);
+  transform: rotate(45deg);
+}
+
+.tarot-card__back-mark::after {
+  content: "";
+  position: absolute;
+  inset: 22%;
+  border: 1px solid var(--otr-hairline);
+}
+
+/* ---- Front face ---- */
+.tarot-card__front {
+  transform: rotateY(180deg);
+  background: linear-gradient(165deg, var(--otr-obsidian-3), var(--otr-obsidian-2));
+  display: flex;
+}
+
+.tarot-card__face-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 8% 8% 6%;
+  transition: transform var(--duration-base) var(--ease-standard);
+}
+
+/* Kartu reversed: seluruh isi wajah kartu diputar 180deg (art + nama),
+   persis seperti kartu fisik yang keluar terbalik. Badge orientasi
+   SENGAJA berada di luar .tarot-card__face-content supaya tetap terbaca
+   tegak. */
+.tarot-card[data-orientation="reversed"] .tarot-card__face-content {
+  transform: rotate(180deg);
+}
+
+.tarot-card__eyebrow {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--otr-mist);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tarot-card__art {
+  flex: 1;
+  margin: 8% 0 6%;
+  min-height: 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--otr-hairline);
+  background-color: var(--otr-plum);
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Fallback selama aset .webp asli belum ada (Phase 2/3 known issue) atau
+   gagal load — background-image kosong/404 tidak menampilkan broken-image
+   icon karena ini bukan <img>, jadi glyph di bawah ini selalu terlihat
+   sampai ada gambar sungguhan menutupinya. */
+.tarot-card__art-fallback {
+  font-family: var(--font-display);
+  font-size: clamp(1.1rem, 9cqi, 2rem);
+  color: var(--otr-gold-dim);
+  line-height: 1;
+}
+
+.tarot-card__name {
+  font-family: var(--font-display);
+  font-size: clamp(0.65rem, 1.1cqi + 0.45rem, 0.95rem);
+  line-height: var(--lh-tight);
+  color: var(--otr-parchment);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tarot-card__orientation-badge {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: 2;
+}
+
+/* ---- Selected state ---- */
+.tarot-card[data-selected="true"] .tarot-card__back,
+.tarot-card[data-selected="true"] .tarot-card__front {
+  border-color: var(--otr-gold);
+  box-shadow: var(--shadow-gold), var(--shadow-md);
+}
+
+/* ---- Interactive / hover state (hanya saat memang bisa diklik) ---- */
+.tarot-card[data-interactive="true"] {
+  cursor: pointer;
+}
+
+.tarot-card[data-interactive="true"]:hover .tarot-card__back,
+.tarot-card[data-interactive="true"]:hover .tarot-card__front,
+.tarot-card[data-interactive="true"]:focus-visible .tarot-card__back,
+.tarot-card[data-interactive="true"]:focus-visible .tarot-card__front {
+  border-color: var(--otr-gold-dim);
+  box-shadow: var(--shadow-md);
+}
+
+.tarot-card[data-interactive="true"]:focus-visible {
+  outline: 2px solid var(--otr-focus-ring);
+  outline-offset: 3px;
+  border-radius: var(--radius-md);
+}
+
+/* ---- Disabled state ---- */
+.tarot-card[data-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ---- Loading state — overlay skeleton shimmer (pakai .skeleton dari
+   components.css, tidak duplikasi keyframes) di atas kedua wajah kartu. ---- */
+.tarot-card__loading-overlay {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border-radius: var(--radius-md);
+}
+
+.tarot-card[data-loading="true"] .tarot-card__loading-overlay {
+  display: block;
+}
+
+/* ---- Grid helper — dipakai Reading (spread layout) & Library (Phase 9) ---- */
+.tarot-card-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  justify-content: center;
+}
+
+.tarot-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--tarot-card-w, 96px), 1fr));
+  gap: var(--space-3);
+}
