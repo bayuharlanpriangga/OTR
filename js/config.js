@@ -15,6 +15,7 @@ export const ROUTES = [
   { path: "/", redirect: "/home" },
   { path: "/home", title: "Home" },
   { path: "/reading", title: "Reading" },
+  { path: "/result", title: "Result" },
   { path: "/daily", title: "Daily" },
   { path: "/library", title: "Library" },
   { path: "/history", title: "History" },

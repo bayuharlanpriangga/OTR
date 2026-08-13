@@ -7,6 +7,7 @@ import { initToasts } from "./components/toast.js";
 function registerRoutes() {
   registerRoute("/home", () => import("./pages/home.js"));
   registerRoute("/reading", () => import("./pages/reading.js"));
+  registerRoute("/result", () => import("./pages/result.js"));
   registerRoute("/daily", () => import("./pages/daily.js"));
   registerRoute("/library", () => import("./pages/library.js"));
   registerRoute("/history", () => import("./pages/history.js"));
