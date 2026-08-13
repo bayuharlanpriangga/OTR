@@ -35,6 +35,16 @@ function eyebrowLabel(card) {
   return [suitLabel, rankLabel].filter(Boolean).join(" · ");
 }
 
+/** Aria-label mentah (belum di-escape) — dipakai baik saat generate markup
+ *  awal (lewat escapeHTML di tarotCardHTML) maupun saat update atribut
+ *  runtime lewat setAttribute (reveal()/hide()), yang tidak butuh escape
+ *  karena DOM API menerima teks literal, bukan string HTML. */
+function buildAriaLabel({ card, revealed, orientation, positionLabel }) {
+  return card
+    ? `${revealed ? card.name : "Kartu tertutup"}${positionLabel ? ` — ${positionLabel}` : ""}${revealed ? ` (${orientation === "reversed" ? "terbalik" : "tegak"})` : ""}`
+    : positionLabel || "Slot kartu kosong";
+}
+
 /**
  * Bangun markup satu tarot card (tanpa mem-bind event apa pun).
  * @param {object} opts
@@ -66,9 +76,7 @@ export function tarotCardHTML({
   const artStyle = card?.image ? ` style="background-image:url('${escapeHTML(card.image)}')"` : "";
   const initial = card ? escapeHTML(card.name.charAt(0)) : "";
 
-  const label = card
-    ? `${revealed ? name : "Kartu tertutup"}${positionLabel ? ` — ${positionLabel}` : ""}${revealed ? ` (${orientation === "reversed" ? "terbalik" : "tegak"})` : ""}`
-    : positionLabel || "Slot kartu kosong";
+  const label = buildAriaLabel({ card, revealed, orientation, positionLabel });
 
   return `
     <div
@@ -91,7 +99,7 @@ export function tarotCardHTML({
           <div class="tarot-card__back-mark"></div>
         </div>
         <div class="tarot-card__front">
-          ${revealed && orientation === "reversed" ? '<span class="badge badge--reversed tarot-card__orientation-badge">Terbalik</span>' : ""}
+          ${orientation === "reversed" ? `<span class="badge badge--reversed tarot-card__orientation-badge" aria-hidden="${!revealed}">Terbalik</span>` : ""}
           <div class="tarot-card__face-content">
             <p class="tarot-card__eyebrow">${eyebrow}</p>
             <div class="tarot-card__art"${artStyle}>
@@ -158,17 +166,30 @@ export function renderTarotCard(container, opts = {}) {
     get el() {
       return currentEl;
     },
-    /** Flip ke front face. Idempotent kalau sudah revealed. */
+    /** Flip ke front face. Idempotent kalau sudah revealed — dan PENTING:
+     *  memutasi elemen yang sudah ada (bukan rerender penuh), karena CSS
+     *  flip transition (.tarot-card__inner, tarot-card.css) cuma jalan
+     *  kalau browser melihat perubahan atribut pada elemen yang SAMA di
+     *  antara dua frame. rerender() mengganti seluruh elemen dengan yang
+     *  baru — dari sudut pandang browser itu elemen lain yang langsung
+     *  "lahir" dengan data-revealed="true", jadi tidak ada apa pun untuk
+     *  di-transisikan (kartu langsung terbuka tanpa animasi). Bug ini
+     *  ditemukan lewat smoke test manual di browser sungguhan. */
     reveal() {
+      if (state.revealed) return;
       state.revealed = true;
       currentEl.dataset.revealed = "true";
-      // Badge & orientation-dependent markup butuh re-render penuh.
-      currentEl = rerender();
+      currentEl.setAttribute("aria-label", buildAriaLabel(state));
+      currentEl.querySelector(".tarot-card__orientation-badge")?.setAttribute("aria-hidden", "false");
     },
-    /** Flip balik ke card back (mis. "Draw ulang" sebelum reading dikonfirmasi). */
+    /** Flip balik ke card back (mis. "Draw ulang" sebelum reading dikonfirmasi).
+     *  Sama seperti reveal() — memutasi elemen yang sama supaya animasinya jalan. */
     hide() {
+      if (!state.revealed) return;
       state.revealed = false;
-      currentEl = rerender();
+      currentEl.dataset.revealed = "false";
+      currentEl.setAttribute("aria-label", buildAriaLabel(state));
+      currentEl.querySelector(".tarot-card__orientation-badge")?.setAttribute("aria-hidden", "true");
     },
     setOrientation(orientation) {
       state.orientation = orientation;

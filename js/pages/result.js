@@ -1,18 +1,30 @@
-// OTR — Page: Result (Phase 5 — Reading MVP / Phase 6 — Interpretation Engine)
-// Menampilkan reading yang baru saja selesai (Master Spec §24). Reading
-// disuplai lewat js/core/state.js (di-patch oleh js/pages/reading.js saat
-// completeReading() dipanggil) — halaman ini membaca state + data
-// (getSpreadById/getCardById) lalu mendelegasikan SELURUH interpretasi
-// (per kartu maupun sintesis) ke js/tarot/interpretation.js. Tidak ada
-// logic makna/keyword/reflection ditulis ulang di sini.
+// OTR — Page: Result (Phase 7 — Result Experience, Master Spec §24)
+// Konten & sumber data TIDAK berubah dari Phase 6: reading disuplai lewat
+// js/core/state.js, dan seluruh interpretasi (per kartu + sintesis) tetap
+// didelegasikan penuh ke js/tarot/interpretation.js. Yang berubah di Phase 7
+// murni presentasi — layout, hierarki visual, dan sequencing — supaya
+// "reading result terasa seperti produk final, bukan debug screen"
+// (Roadmap Phase 7, DONE WHEN).
 //
-// "OVERALL THEME / KEY MESSAGE / REFLECTION" (Master Spec §24) sekarang
-// benar-benar hasil synthesizeReading() (Master Spec §23), bukan lagi
-// ringkasan sementara — itu bedanya dari versi Phase 5.
-//
-// Layout/polish penuh ala Master Spec §24 (mis. "Result page harus bisa
-// dibaca tanpa membuka banyak modal", styling final) tetap scope Phase 7 —
-// Result Experience. Di sini fokusnya konten sudah benar & lengkap.
+// Perubahan struktural dari Phase 6:
+// - Header sekarang berupa hero block (eyebrow + nama spread + kutipan
+//   pertanyaan + timestamp "Diselesaikan pada ..." dari reading.completedAt).
+// - Setiap kartu dirender dengan "rail" posisi (nomor + garis penghubung)
+//   supaya urutan spread (mis. Situation → Challenge → Advice) terbaca
+//   sekilas — bukan cuma daftar kartu lepas. Deskripsi posisi (dari
+//   spread.positions[].description, Master Spec §12) ikut ditampilkan
+//   sebagai konteks singkat — field yang sudah ada sejak Phase 2 tapi belum
+//   pernah dipakai di UI manapun.
+// - Overall Theme / Key Message / Reflection sekarang satu panel visual
+//   ("result-synthesis") yang ditonjolkan lewat border + watermark .weave
+//   tipis — menandakan ini kesimpulan, bukan section sejajar dengan daftar
+//   kartu di atasnya.
+// - Divider generik <hr> diganti ornamen tipis (.result-divider) yang
+//   konsisten dengan bahasa visual "foil accent" aplikasi.
+// - Tombol aksi memakai ikon (js/components/icons.js) — pola yang sudah
+//   dipakai di sidebar/bottom-nav, sekarang dipakai pertama kali di tombol.
+// - Section-section masuk dengan reveal beruntun (lihat css/reading.css +
+//   css/animations.css), otomatis nonaktif di bawah prefers-reduced-motion.
 
 import { getState, resetReading } from "../core/state.js";
 import { getSpreadById } from "../tarot/spreads.js";
@@ -22,6 +34,8 @@ import { tarotCardHTML } from "../components/tarot-card.js";
 import { emptyStateHTML } from "../components/empty-state.js";
 import { showToast } from "../components/toast.js";
 import { navigate } from "../router.js";
+import { icon } from "../components/icons.js";
+import { formatDate } from "../core/utils.js";
 
 const CATEGORY_LABELS = {
   general: "Umum",
@@ -42,9 +56,13 @@ function keywordChips(keywords = []) {
   return keywords.map((k) => `<span class="badge">${escapeHTML(k)}</span>`).join("");
 }
 
+function dividerHTML() {
+  return `<div class="result-divider" aria-hidden="true"></div>`;
+}
+
 function renderEmpty(container) {
   container.innerHTML = `
-    <section class="stack gap-5">
+    <section class="result-page stack gap-5">
       ${emptyStateHTML({
         title: "Belum ada hasil reading",
         message: "Mulai reading baru untuk melihat hasilnya di sini.",
@@ -52,6 +70,37 @@ function renderEmpty(container) {
         actionHref: "#/reading",
       })}
     </section>
+  `;
+}
+
+function cardEntryHTML({ entry, position, card, category, question, isLast }) {
+  if (!card || !position) return "";
+
+  const interpretation = interpretCard({ card, orientation: entry.orientation, position, category, question });
+
+  return `
+    <div class="result-card-entry">
+      <div class="result-card-entry__rail">
+        <div class="result-card-entry__index font-mono">${position.index + 1}</div>
+        ${isLast ? "" : `<div class="result-card-entry__line" aria-hidden="true"></div>`}
+      </div>
+      <div class="result-card-entry__body">
+        <div class="result-card-entry__visual">
+          ${tarotCardHTML({ card, orientation: entry.orientation, revealed: true, interactive: false, size: "md" })}
+        </div>
+        <div class="result-card-entry__content stack gap-2">
+          <div class="stack gap-1">
+            <p class="eyebrow">${escapeHTML(position.name)}</p>
+            ${position.description ? `<p class="text-sm text-muted result-card-entry__position-desc">${escapeHTML(position.description)}</p>` : ""}
+          </div>
+          <h3>${escapeHTML(card.name)} ${entry.orientation === "reversed" ? '<span class="badge badge--reversed">Terbalik</span>' : ""}</h3>
+          <div class="row gap-2" style="flex-wrap:wrap;">${keywordChips(interpretation.keywords)}</div>
+          <p class="text-sm">${escapeHTML(interpretation.meaning)}</p>
+          <p class="text-sm text-muted"><strong class="text-sm" style="color:var(--otr-parchment-dim);">Nasihat:</strong> ${escapeHTML(interpretation.advice)}</p>
+          <p class="text-sm text-muted" style="font-style:italic;">${escapeHTML(interpretation.reflection)}</p>
+        </div>
+      </div>
+    </div>
   `;
 }
 
@@ -71,89 +120,65 @@ function renderResult(container, reading) {
     card: getCardById(entry.cardId),
   }));
 
+  const validEntries = entries.filter(({ card, position }) => card && position);
+
   const synthesis = synthesizeReading({
-    entries: entries
-      .filter(({ card, position }) => card && position)
-      .map(({ entry, position, card }) => ({ card, orientation: entry.orientation, position })),
+    entries: validEntries.map(({ entry, position, card }) => ({ card, orientation: entry.orientation, position })),
     category,
     question: reading.question ?? "",
   });
 
   container.innerHTML = `
-    <section class="stack gap-6" style="max-width:72ch;">
-      <div class="stack gap-2">
+    <section class="result-page stack gap-6">
+      <div class="result-header result-section stack gap-3">
         <p class="eyebrow">Reading Selesai</p>
         <h1 class="font-display">${escapeHTML(spread.name)}</h1>
         ${
           reading.question
-            ? `<p class="text-muted" style="font-style:italic;">“${escapeHTML(reading.question)}”</p>`
+            ? `<p class="result-question">“${escapeHTML(reading.question)}”</p>`
             : `<p class="text-muted text-sm">Tidak ada pertanyaan spesifik untuk reading ini.</p>`
         }
+        ${reading.completedAt ? `<p class="result-header__timestamp">Diselesaikan pada ${escapeHTML(formatDate(reading.completedAt))}</p>` : ""}
       </div>
 
-      <hr style="border:none; border-top:1px solid var(--otr-hairline);" />
+      ${dividerHTML()}
 
-      <div class="stack gap-5">
-        <p class="eyebrow">Spread</p>
-        <div class="stack gap-5">
-          ${entries
-            .map(({ entry, position, card }) => {
-              if (!card || !position) return "";
-              const interpretation = interpretCard({
-                card,
-                orientation: entry.orientation,
-                position,
-                category,
-                question: reading.question ?? "",
-              });
-              return `
-                <div class="card row gap-5" style="align-items:flex-start; flex-wrap:wrap;">
-                  <div style="flex-shrink:0; margin:0 auto;">
-                    ${tarotCardHTML({ card, orientation: entry.orientation, revealed: true, interactive: false, size: "md" })}
-                  </div>
-                  <div class="stack gap-2" style="flex:1; min-width:220px;">
-                    <p class="eyebrow">${escapeHTML(position.name)}</p>
-                    <h3>${escapeHTML(card.name)} ${entry.orientation === "reversed" ? '<span class="badge badge--reversed">Terbalik</span>' : ""}</h3>
-                    <div class="row gap-2" style="flex-wrap:wrap;">${keywordChips(interpretation.keywords)}</div>
-                    <p class="text-sm">${escapeHTML(interpretation.meaning)}</p>
-                    <p class="text-sm text-muted"><strong class="text-sm" style="color:var(--otr-parchment-dim);">Nasihat:</strong> ${escapeHTML(interpretation.advice)}</p>
-                    <p class="text-sm text-muted" style="font-style:italic;">${escapeHTML(interpretation.reflection)}</p>
-                  </div>
-                </div>
-              `;
-            })
+      <div class="result-section stack gap-5">
+        <p class="eyebrow">Spread &middot; ${validEntries.length} Kartu</p>
+        <div class="result-cards">
+          ${validEntries
+            .map((item, i) => cardEntryHTML({ ...item, category, question: reading.question ?? "", isLast: i === validEntries.length - 1 }))
             .join("")}
         </div>
       </div>
 
-      <hr style="border:none; border-top:1px solid var(--otr-hairline);" />
+      ${dividerHTML()}
 
-      <div class="stack gap-4">
-        <div class="stack gap-2">
+      <div class="result-section card result-synthesis">
+        <div class="result-synthesis__watermark weave"></div>
+        <div class="result-synthesis__block stack gap-2">
           <p class="eyebrow">Overall Theme</p>
           <p class="text-sm">${escapeHTML(synthesis.theme)}</p>
-          <div class="row gap-2" style="flex-wrap:wrap;">
-            ${synthesis.dominantKeywords.length ? keywordChips(synthesis.dominantKeywords) : ""}
-          </div>
+          ${synthesis.dominantKeywords.length ? `<div class="row gap-2" style="flex-wrap:wrap;">${keywordChips(synthesis.dominantKeywords)}</div>` : ""}
         </div>
 
-        <div class="stack gap-2">
+        <div class="result-synthesis__block stack gap-2">
           <p class="eyebrow">Key Message</p>
           <p class="text-sm">${escapeHTML(synthesis.keyMessage)}</p>
         </div>
 
-        <div class="stack gap-2">
+        <div class="result-synthesis__block stack gap-2">
           <p class="eyebrow">Reflection</p>
           <p class="text-sm text-muted" style="font-style:italic;">${escapeHTML(synthesis.reflection)}</p>
         </div>
       </div>
 
-      <hr style="border:none; border-top:1px solid var(--otr-hairline);" />
+      ${dividerHTML()}
 
-      <div class="row gap-3" style="flex-wrap:wrap;">
-        <button type="button" class="btn btn--primary" data-new-reading>Reading Baru</button>
-        <button type="button" class="btn btn--secondary" disabled title="Tersedia di Phase 8 (Local Storage)">Simpan Reading</button>
-        <button type="button" class="btn btn--secondary" disabled title="Tersedia di Phase 11 (Journal)">Tulis Journal</button>
+      <div class="result-section result-actions row gap-3" style="flex-wrap:wrap;">
+        <button type="button" class="btn btn--primary" data-new-reading>${icon("sparkle", { size: 16 })} Reading Baru</button>
+        <button type="button" class="btn btn--secondary" disabled title="Tersedia di Phase 8 (Local Storage)">${icon("bookmark", { size: 16 })} Simpan Reading</button>
+        <button type="button" class="btn btn--secondary" disabled title="Tersedia di Phase 11 (Journal)">${icon("feather", { size: 16 })} Tulis Journal</button>
       </div>
     </section>
   `;

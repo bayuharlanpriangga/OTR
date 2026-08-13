@@ -31,3 +31,14 @@
   0%, 100% { transform: rotate(6deg) translate(6px, 0); }
   45% { transform: rotate(16deg) translate(38px, -10px); }
 }
+
+/* ---- Result page reveal (Phase 7 — Result Experience) ----
+   Kartu/section masuk dengan fade + sedikit translate, di-stagger lewat
+   animation-delay per elemen (reading.css). Durasi pakai --duration-slow
+   supaya otomatis 0ms di bawah prefers-reduced-motion (variables.css) —
+   safety-net tambahan (animation: none) tetap dipasang di reading.css
+   untuk menghindari delay yang masih "terasa" walau durasi 0. */
+@keyframes result-reveal {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}

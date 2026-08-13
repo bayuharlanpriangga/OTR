@@ -79,14 +79,204 @@
   align-items: flex-start;
 }
 
-/* ---- Result page ---- */
-.reading-interpretation + hr,
-.stack hr {
+/* ==========================================================================
+   Result page (Phase 7 — Result Experience, Master Spec §24)
+   Konten & data sudah lengkap sejak Phase 5/6 — file ini murni memberi
+   hierarki visual: hero header → spread (card list dengan "rail" posisi)
+   → panel sintesis yang ditonjolkan → action band. Setiap section masuk
+   dengan reveal beruntun (lihat animations.css) supaya terasa seperti hasil
+   yang "disingkap", bukan sekadar konten yang dump ke layar sekaligus.
+   ========================================================================== */
+
+.result-page {
   width: 100%;
+  max-width: 72ch;
+  margin: 0 auto;
+}
+
+.result-section {
+  animation: result-reveal var(--duration-slow) var(--ease-out-soft) both;
+}
+
+.result-section:nth-of-type(1) { animation-delay: 0ms; }
+.result-section:nth-of-type(2) { animation-delay: 90ms; }
+.result-section:nth-of-type(3) { animation-delay: 180ms; }
+.result-section:nth-of-type(4) { animation-delay: 260ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .result-section {
+    animation: none;
+  }
+}
+
+/* ---- Header ---- */
+.result-header {
+  position: relative;
+  padding: var(--space-5) var(--space-2) 0;
+}
+
+.result-header__timestamp {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--otr-mist);
+}
+
+.result-question {
+  color: var(--otr-parchment-dim);
+  font-style: italic;
+  font-size: var(--fs-md);
+  border-left: 2px solid var(--otr-gold-dim);
+  padding-left: var(--space-4);
+}
+
+/* ---- Ornamental divider (signature touch, ganti <hr> generik) ---- */
+.result-divider {
+  position: relative;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--otr-hairline) 20%, var(--otr-hairline) 80%, transparent);
+  margin: var(--space-2) 0;
+}
+
+.result-divider::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 7px;
+  height: 7px;
+  background: var(--otr-obsidian);
+  border: 1px solid var(--otr-gold-dim);
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+/* ---- Card list — setiap kartu punya "rail" posisi (nomor + garis
+   penghubung) supaya urutan spread terbaca sekilas, bukan cuma daftar
+   kartu lepas. ---- */
+.result-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.result-card-entry {
+  display: flex;
+  gap: var(--space-4);
+  padding-bottom: var(--space-6);
+}
+
+.result-card-entry:last-child {
+  padding-bottom: 0;
+}
+
+.result-card-entry__rail {
+  flex-shrink: 0;
+  width: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.result-card-entry__index {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--otr-gold-dim);
+  background: var(--otr-obsidian-2);
+  color: var(--otr-gold);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.result-card-entry__line {
+  flex: 1;
+  width: 1px;
+  min-height: var(--space-5);
+  margin-top: var(--space-2);
+  background: var(--otr-hairline);
+}
+
+.result-card-entry__body {
+  display: flex;
+  gap: var(--space-5);
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.result-card-entry__visual {
+  flex-shrink: 0;
+  margin: 0 auto;
+}
+
+.result-card-entry__content {
+  flex: 1;
+  min-width: 220px;
+}
+
+.result-card-entry__position-desc {
+  font-style: italic;
+}
+
+/* ---- Synthesis panel — sengaja ditonjolkan (border gold-dim + weave
+   watermark tipis) supaya jelas beda tingkat dari daftar kartu di
+   atasnya: ini "kesimpulan", bukan entri lain dalam daftar. ---- */
+.result-synthesis {
+  position: relative;
+  overflow: hidden;
+  border-color: var(--otr-gold-dim);
+  background: linear-gradient(165deg, var(--otr-obsidian-2), var(--otr-plum) 160%);
+}
+
+.result-synthesis__watermark {
+  position: absolute;
+  inset: 0;
+  opacity: 0.05;
+  pointer-events: none;
+}
+
+.result-synthesis__block {
+  position: relative;
+}
+
+.result-synthesis__block + .result-synthesis__block {
+  margin-top: var(--space-5);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--otr-hairline);
+}
+
+/* ---- Action band ---- */
+.result-actions {
+  padding-top: var(--space-2);
+}
+
+.result-actions .btn svg {
+  flex-shrink: 0;
 }
 
 @media (max-width: 640px) {
   .shuffle-deck {
     width: clamp(96px, 40vw, 140px);
+  }
+
+  .result-card-entry__rail {
+    width: 22px;
+  }
+
+  .result-card-entry__index {
+    width: 22px;
+    height: 22px;
+  }
+
+  .result-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .result-actions .btn {
+    width: 100%;
   }
 }

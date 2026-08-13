@@ -15,6 +15,8 @@ const ICONS = {
   user: '<circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c1.2-3.8 4-5.5 7-5.5s5.8 1.7 7 5.5"/>',
   close: '<path d="M6 6l12 12M18 6 6 18"/>',
   menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+  bookmark: '<path d="M6 3.5h12v17l-6-4-6 4v-17Z"/>',
+  sparkle: '<path d="M12 3v5M12 16v5M3 12h5M16 12h5M6.5 6.5l2.5 2.5M15 15l2.5 2.5M17.5 6.5 15 9M9 15l-2.5 2.5"/>',
 };
 
 export function icon(name, { size = 18, className = "" } = {}) {
