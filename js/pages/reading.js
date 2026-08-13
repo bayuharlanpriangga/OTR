@@ -15,6 +15,7 @@
 
 import { createTarotEngine } from "../tarot/tarot-engine.js";
 import { getAllSpreads } from "../tarot/spreads.js";
+import { interpretCard, synthesizeReading } from "../tarot/interpretation.js";
 import { renderTarotCard } from "../components/tarot-card.js";
 import { openModal } from "../components/modal.js";
 import { showToast } from "../components/toast.js";
@@ -47,16 +48,8 @@ function prefersReducedMotion() {
   return typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-/** Ambil teks makna kartu sesuai orientasi + kategori, dengan fallback ke "general" (Master Spec §22, disederhanakan). */
-function pickMeaning(card, orientation, category) {
-  const bucket = orientation === "reversed" ? card.reversed : card.upright;
-  return bucket?.[category] || bucket?.general || "";
-}
-
-function pickAdvice(card, orientation) {
-  const bucket = orientation === "reversed" ? card.reversed : card.upright;
-  return bucket?.advice || "";
-}
+/** Ket: pickMeaning()/pickAdvice() versi Phase 5 sudah digantikan sepenuhnya
+ * oleh js/tarot/interpretation.js (Phase 6) — lihat interpretCard(). */
 
 function keywordChips(keywords = []) {
   return keywords.map((k) => `<span class="badge">${escapeHTML(k)}</span>`).join("");
@@ -463,8 +456,13 @@ function showDrawStep(container, flow) {
 
   function showInterpretation(entry, isLast) {
     const { card, orientation } = entry;
-    const meaning = pickMeaning(card, orientation, flow.category);
-    const advice = pickAdvice(card, orientation);
+    const interpretation = interpretCard({
+      card,
+      orientation,
+      position: upcomingPosition,
+      category: flow.category,
+      question: flow.question,
+    });
 
     interpretationEl.hidden = false;
     interpretationEl.innerHTML = `
@@ -473,9 +471,10 @@ function showDrawStep(container, flow) {
           <h3>${escapeHTML(card.name)}</h3>
           <span class="badge ${orientation === "reversed" ? "badge--reversed" : ""}">${orientation === "reversed" ? "Terbalik" : "Tegak"}</span>
         </div>
-        <div class="row gap-2" style="flex-wrap:wrap;">${keywordChips(card.keywords)}</div>
-        ${meaning ? `<p>${escapeHTML(meaning)}</p>` : ""}
-        ${advice ? `<p class="text-sm text-muted"><strong class="text-sm" style="color:var(--otr-parchment-dim);">Nasihat:</strong> ${escapeHTML(advice)}</p>` : ""}
+        <div class="row gap-2" style="flex-wrap:wrap;">${keywordChips(interpretation.keywords)}</div>
+        <p>${escapeHTML(interpretation.meaning)}</p>
+        <p class="text-sm text-muted"><strong class="text-sm" style="color:var(--otr-parchment-dim);">Nasihat:</strong> ${escapeHTML(interpretation.advice)}</p>
+        <p class="text-sm text-muted" style="font-style:italic;">${escapeHTML(interpretation.reflection)}</p>
       </div>
     `;
 
@@ -492,14 +491,16 @@ function showDrawStep(container, flow) {
 
   function finishReading() {
     const reading = flow.engine.getReading();
-    const dominantKeywords = [
-      ...new Set(
-        reading.cards.flatMap((c) => flow.engine.deck.drawnCards.find((dc) => dc.id === c.cardId)?.keywords ?? [])
-      ),
-    ].slice(0, 6);
-    const summary = dominantKeywords.join(", ");
+    const spread = flow.spread;
 
-    const completed = flow.engine.completeReading(summary);
+    const entries = reading.cards.map((c) => ({
+      card: flow.engine.deck.drawnCards.find((dc) => dc.id === c.cardId),
+      orientation: c.orientation,
+      position: spread.positions.find((p) => p.id === c.positionId),
+    }));
+
+    const synthesis = synthesizeReading({ entries, category: flow.category, question: flow.question });
+    const completed = flow.engine.completeReading(synthesis.theme);
 
     patchState("reading", {
       ...completed,
