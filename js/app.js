@@ -11,6 +11,7 @@ function registerRoutes() {
   registerRoute("/result", () => import("./pages/result.js"));
   registerRoute("/daily", () => import("./pages/daily.js"));
   registerRoute("/library", () => import("./pages/library.js"));
+  registerRoute("/library/:cardId", () => import("./pages/card-detail.js"));
   registerRoute("/history", () => import("./pages/history.js"));
   registerRoute("/history/:readingId", () => import("./pages/history-detail.js"));
   registerRoute("/journal", () => import("./pages/journal.js"));
