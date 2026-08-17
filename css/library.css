@@ -1,5 +1,104 @@
 /* ==========================================================================
-   OTR — Library styles
-   Placeholder — akan diisi di phase yang relevan.
-   Untuk saat ini, responsive rules app-shell ada di layout.css.
+   OTR — Library styles (Phase 9 — Tarot Library, Roadmap Phase 9)
+   Grid 78 kartu dipakai dari .tarot-card-grid (tarot-card.css, sudah
+   disiapkan sejak Phase 4 khusus untuk fase ini). File ini murni styling
+   untuk: toolbar search/filter di /library, dan layout Card Detail di
+   /library/:cardId (js/pages/card-detail.js).
    ========================================================================== */
+
+/* ---- Library toolbar (search + filter Arcana/Suit) ---- */
+.library-toolbar input[type="search"] {
+  width: 100%;
+}
+
+.library-filters select {
+  min-width: 160px;
+}
+
+.library-filters select:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .library-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .library-filters select {
+    width: 100%;
+  }
+}
+
+/* ==========================================================================
+   Card Detail page (Master Spec §30)
+   ========================================================================== */
+
+.card-detail {
+  width: 100%;
+  max-width: 72ch;
+  margin: 0 auto;
+}
+
+.card-detail__visual {
+  flex-shrink: 0;
+  margin: 0 auto;
+}
+
+/* Ornamental divider — pola sama seperti .result-divider di reading.css,
+   diduplikasi (bukan diimpor lintas file) supaya library.css tetap
+   self-contained mengikuti konvensi "satu file CSS per domain halaman"
+   yang sudah dipakai proyek ini (reading.css, dashboard.css, journal.css). */
+.card-detail__divider {
+  position: relative;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--otr-hairline) 20%, var(--otr-hairline) 80%, transparent);
+  margin: var(--space-2) 0;
+}
+
+.card-detail__divider::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 7px;
+  height: 7px;
+  background: var(--otr-obsidian);
+  border: 1px solid var(--otr-gold-dim);
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.card-detail__orientation h2 {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--otr-gold);
+}
+
+.card-detail__meanings {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-5);
+}
+
+.card-detail__block + .card-detail__block {
+  padding-top: var(--space-4);
+}
+
+@media (max-width: 640px) {
+  .card-detail__header {
+    flex-direction: column;
+    align-items: center !important;
+    text-align: center;
+  }
+
+  .card-detail__meanings {
+    grid-template-columns: 1fr;
+  }
+
+  .card-detail__block + .card-detail__block {
+    border-top: 1px solid var(--otr-hairline);
+  }
+}
