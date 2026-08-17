@@ -104,3 +104,11 @@
     --duration-slow: 0ms;
   }
 }
+
+/* Companion rule (Phase 8 — Local Storage): toggle manual di Settings,
+   lihat penjelasan lengkap di reset.css tepat di atas blok yang sama. */
+html[data-reduced-motion="true"] {
+  --duration-fast: 0ms;
+  --duration-base: 0ms;
+  --duration-slow: 0ms;
+}

@@ -21,6 +21,7 @@ import { openModal } from "../components/modal.js";
 import { showToast } from "../components/toast.js";
 import { patchState } from "../core/state.js";
 import { navigate } from "../router.js";
+import { prefersReducedMotion } from "../core/utils.js";
 
 const CATEGORY_LABELS = {
   general: "Umum",
@@ -42,10 +43,6 @@ function escapeHTML(str = "") {
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
-}
-
-function prefersReducedMotion() {
-  return typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
 /** Ket: pickMeaning()/pickAdvice() versi Phase 5 sudah digantikan sepenuhnya

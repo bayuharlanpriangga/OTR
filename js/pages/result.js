@@ -36,6 +36,7 @@ import { showToast } from "../components/toast.js";
 import { navigate } from "../router.js";
 import { icon } from "../components/icons.js";
 import { formatDate } from "../core/utils.js";
+import { saveGuestReading, getGuestReadingById } from "../core/storage.js";
 
 const CATEGORY_LABELS = {
   general: "Umum",
@@ -73,10 +74,8 @@ function renderEmpty(container) {
   `;
 }
 
-function cardEntryHTML({ entry, position, card, category, question, isLast }) {
+function cardEntryHTML({ entry, position, card, interpretation, isLast }) {
   if (!card || !position) return "";
-
-  const interpretation = interpretCard({ card, orientation: entry.orientation, position, category, question });
 
   return `
     <div class="result-card-entry">
@@ -104,6 +103,34 @@ function cardEntryHTML({ entry, position, card, category, question, isLast }) {
   `;
 }
 
+function buildSavedReading({ reading, spread, category, validEntries, synthesis }) {
+  return {
+    id: reading.id,
+    spreadId: spread.id,
+    spreadName: spread.name,
+    question: reading.question ?? "",
+    intention: reading.intention ?? "",
+    category,
+    status: "completed",
+    isFavorite: false,
+    createdAt: reading.createdAt ?? null,
+    completedAt: reading.completedAt ?? null,
+    savedAt: new Date().toISOString(),
+    // Master Spec §32 — snapshot per kartu disimpan apa adanya, tidak boleh
+    // dihitung ulang lagi oleh siapa pun setelah ini (lihat history-detail.js).
+    cards: validEntries.map(({ entry, position, card, interpretation }) => ({
+      positionId: position.id,
+      positionName: position.name,
+      positionDescription: position.description ?? "",
+      cardId: card.id,
+      cardName: card.name,
+      orientation: entry.orientation,
+      interpretationSnapshot: interpretation,
+    })),
+    synthesisSnapshot: synthesis,
+  };
+}
+
 function renderResult(container, reading) {
   const spread = getSpreadById(reading.spreadId);
 
@@ -120,13 +147,20 @@ function renderResult(container, reading) {
     card: getCardById(entry.cardId),
   }));
 
-  const validEntries = entries.filter(({ card, position }) => card && position);
+  const validEntries = entries
+    .filter(({ card, position }) => card && position)
+    .map((item) => ({
+      ...item,
+      interpretation: interpretCard({ card: item.card, orientation: item.entry.orientation, position: item.position, category, question: reading.question ?? "" }),
+    }));
 
   const synthesis = synthesizeReading({
     entries: validEntries.map(({ entry, position, card }) => ({ card, orientation: entry.orientation, position })),
     category,
     question: reading.question ?? "",
   });
+
+  const alreadySaved = Boolean(getGuestReadingById(reading.id));
 
   container.innerHTML = `
     <section class="result-page stack gap-6">
@@ -146,9 +180,7 @@ function renderResult(container, reading) {
       <div class="result-section stack gap-5">
         <p class="eyebrow">Spread &middot; ${validEntries.length} Kartu</p>
         <div class="result-cards">
-          ${validEntries
-            .map((item, i) => cardEntryHTML({ ...item, category, question: reading.question ?? "", isLast: i === validEntries.length - 1 }))
-            .join("")}
+          ${validEntries.map((item, i) => cardEntryHTML({ ...item, isLast: i === validEntries.length - 1 })).join("")}
         </div>
       </div>
 
@@ -177,7 +209,7 @@ function renderResult(container, reading) {
 
       <div class="result-section result-actions row gap-3" style="flex-wrap:wrap;">
         <button type="button" class="btn btn--primary" data-new-reading>${icon("sparkle", { size: 16 })} Reading Baru</button>
-        <button type="button" class="btn btn--secondary" disabled title="Tersedia di Phase 8 (Local Storage)">${icon("bookmark", { size: 16 })} Simpan Reading</button>
+        <button type="button" class="btn btn--secondary" data-save-reading ${alreadySaved ? "disabled" : ""}>${icon("bookmark", { size: 16 })} <span data-save-label>${alreadySaved ? "Tersimpan" : "Simpan Reading"}</span></button>
         <button type="button" class="btn btn--secondary" disabled title="Tersedia di Phase 11 (Journal)">${icon("feather", { size: 16 })} Tulis Journal</button>
       </div>
     </section>
@@ -186,6 +218,20 @@ function renderResult(container, reading) {
   container.querySelector("[data-new-reading]")?.addEventListener("click", () => {
     resetReading();
     navigate("/reading");
+  });
+
+  const saveBtn = container.querySelector("[data-save-reading]");
+  saveBtn?.addEventListener("click", () => {
+    const record = buildSavedReading({ reading, spread, category, validEntries, synthesis });
+    const ok = saveGuestReading(record);
+    if (!ok) {
+      showToast("Gagal menyimpan reading. Coba lagi.", "danger");
+      return;
+    }
+    saveBtn.disabled = true;
+    const label = saveBtn.querySelector("[data-save-label]");
+    if (label) label.textContent = "Tersimpan";
+    showToast("Reading tersimpan. Bisa dibuka lagi lewat History.", "success");
   });
 }
 

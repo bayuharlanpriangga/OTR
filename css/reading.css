@@ -109,6 +109,12 @@
   }
 }
 
+/* Companion rule (Phase 8 — Local Storage): toggle manual di Settings,
+   lihat penjelasan lengkap di reset.css. */
+html[data-reduced-motion="true"] .result-section {
+  animation: none;
+}
+
 /* ---- Header ---- */
 .result-header {
   position: relative;

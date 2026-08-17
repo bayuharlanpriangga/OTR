@@ -42,3 +42,15 @@ export function debounce(fn, wait = 200) {
     t = setTimeout(() => fn(...args), wait);
   };
 }
+
+/** Gabungan preferensi OS (`prefers-reduced-motion` media query) DAN toggle
+ *  manual di Settings (Phase 8) — mana pun yang aktif, dianggap "kurangi
+ *  animasi". Toggle manual diterapkan lewat atribut `data-reduced-motion`
+ *  di `<html>` (di-set saat boot & saat toggle diubah — lihat app.js &
+ *  js/pages/settings.js), yang juga dibaca companion rule di reset.css/
+ *  variables.css/reading.css untuk mematikan animasi CSS secara global. */
+export function prefersReducedMotion() {
+  const osPref = typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const manualPref = typeof document !== "undefined" && document.documentElement.dataset.reducedMotion === "true";
+  return Boolean(osPref || manualPref);
+}

@@ -69,3 +69,17 @@ button:disabled {
     scroll-behavior: auto !important;
   }
 }
+
+/* Companion rule (Phase 8 — Local Storage): toggle manual di Settings
+   (otr_settings.reducedMotion), diterapkan lewat data-reduced-motion di
+   <html> — lihat js/app.js (apply saat boot) & js/pages/settings.js
+   (apply saat toggle diubah). Sengaja mirror 1:1 blok media query di atas
+   supaya OS preference dan toggle manual punya kekuatan yang sama. */
+html[data-reduced-motion="true"] *,
+html[data-reduced-motion="true"] *::before,
+html[data-reduced-motion="true"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
