@@ -43,6 +43,29 @@ export async function signInWithEmail(email, password) {
   return supabase.auth.signInWithPassword({ email, password });
 }
 
+/**
+ * Google OAuth. Master Spec §47 menandai Google/Apple/Magic Link sebagai
+ * "Future" TANPA mengikatnya ke nomor phase tertentu di Roadmap (beda dari
+ * fitur lain yang eksplisit dijadwalkan Phase 14-27) -- jadi ini ditambah
+ * di luar urutan phase, bukan mendahului fase yang sudah dijadwalkan.
+ * Provider Google sudah diaktifkan manual di Supabase Dashboard (Orias).
+ *
+ * signInWithOAuth() by default langsung me-redirect browser ke Google
+ * (window.location assign) begitu promise ini resolve tanpa error --
+ * TIDAK ada session dikembalikan di sini, beda dari signInWithEmail.
+ * Setelah user approve di Google, browser diarahkan balik ke redirectTo
+ * (SITE_URL) membawa access_token di URL hash (implicit flow) -- lihat
+ * app.js untuk kenapa itu perlu ditangani SEBELUM router baca hash.
+ * @returns {Promise<{data: {provider: string, url: string}, error: object|null}>}
+ */
+export async function signInWithGoogle() {
+  const supabase = getSupabaseClient();
+  return supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: SITE_URL },
+  });
+}
+
 /** @returns {Promise<{error: object|null}>} */
 export async function signOut() {
   const supabase = getSupabaseClient();

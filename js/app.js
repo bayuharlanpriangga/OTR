@@ -1,7 +1,7 @@
 // OTR — App Entry Point
 
 import { mountAppShell } from "./components/app-shell.js";
-import { initRouter, registerRoute } from "./router.js";
+import { initRouter, registerRoute, navigate } from "./router.js";
 import { initToasts } from "./components/toast.js";
 import { getSettings } from "./core/storage.js";
 import { setState } from "./core/state.js";
@@ -36,27 +36,28 @@ function applyStoredMotionPreference() {
 }
 
 /** Session Persistence (Phase 13, Master Spec §47) — pulihkan sesi Supabase
- *  yang tersimpan (kalau ada) ke state.user, lalu dengarkan perubahan status
- *  auth berikutnya (login di tab lain, token refresh, logout) supaya
- *  state.user selalu ikut sinkron. Dipanggil fire-and-forget (tidak
- *  di-`await` di main()) supaya pemulihan sesi tidak menunda paint pertama
- *  -- halaman yang membaca state.user (mis. settings.js) sudah membacanya
- *  ulang tiap kali di-render lewat router, jadi cukup toleran walau sesi
- *  baru resolve sesaat setelah shell tampil.
- *
- *  TIDAK memanggil migration-service.js dari sini -- Guest Migration cuma
- *  dipicu eksplisit dari login.js/register.js tepat setelah aksi login
- *  (lihat komentar di migration-service.js), bukan dari sini, supaya tidak
- *  ada percobaan migrasi ganda saat sesi lama dipulihkan/token di-refresh.
+ *  yang tersimpan (kalau ada) ke state.user.
  */
-async function restoreSessionAndSubscribe() {
+async function restoreSession() {
   try {
     const user = await getCurrentUser();
     setState({ user });
   } catch (err) {
     console.warn("[app] gagal memulihkan sesi Supabase", err);
   }
+}
 
+/** Dengarkan perubahan status auth berikutnya (login di tab lain, token
+ *  refresh, logout, Google OAuth) supaya state.user selalu ikut sinkron.
+ *  Dipisah dari restoreSession() (lihat main()) supaya listener didaftarkan
+ *  sekali saja, terlepas dari jalur mana restoreSession() dipanggil.
+ *
+ *  TIDAK memanggil migration-service.js dari sini -- Guest Migration cuma
+ *  dipicu eksplisit dari login.js/register.js tepat setelah aksi login
+ *  (lihat komentar di migration-service.js), bukan dari sini, supaya tidak
+ *  ada percobaan migrasi ganda saat sesi lama dipulihkan/token di-refresh.
+ */
+function subscribeAuthChanges() {
   try {
     onAuthStateChange((_event, session) => {
       setState({ user: session?.user ?? null });
@@ -64,6 +65,25 @@ async function restoreSessionAndSubscribe() {
   } catch (err) {
     console.warn("[app] gagal mendengarkan perubahan status auth", err);
   }
+}
+
+/**
+ * True kalau URL hash saat ini adalah fragment yang ditaruh SUPABASE
+ * (implicit-flow redirect Google OAuth, atau link reset-password/
+ * konfirmasi email), BUKAN hash route app sendiri (selalu diawali "#/").
+ *
+ * Kenapa perlu: app pakai hash router (Master Spec §3, "static hosting
+ * compatible"), dan Supabase JUGA menaruh token di URL hash
+ * (#access_token=...&type=signup|recovery) setelah redirect balik dari
+ * Google/link email. Dua mekanisme berebut fragment yang sama. Kalau
+ * router.js sempat parseHash() token itu duluan, dia dianggap path route
+ * tak dikenal -> "Halaman tidak ditemukan" -- padahal Supabase Client
+ * (dibuat lewat restoreSession() -> getCurrentUser()) sebenarnya berhasil
+ * memproses token itu jadi sesi valid di belakang layar. User kelihatan
+ * gagal padahal login-nya sukses.
+ */
+function hashHasSupabaseAuthParams() {
+  return /access_token=|refresh_token=|type=recovery|error_description=/.test(window.location.hash);
 }
 
 function main() {
@@ -74,8 +94,23 @@ function main() {
 
   registerRoutes();
   initToasts();
-  initRouter(contentOutlet);
-  restoreSessionAndSubscribe();
+  subscribeAuthChanges();
+
+  if (hashHasSupabaseAuthParams()) {
+    // Tunda render pertama SAMPAI Supabase selesai konsumsi token di hash,
+    // baru arahkan ke Home lewat navigate() -- ini menimpa hash lama dengan
+    // "#/home" yang router bisa baca normal. Hanya kejadian di kasus ini
+    // (redirect OAuth/reset-password/konfirmasi email) -- kunjungan normal
+    // & login email/password biasa tetap fire-and-forget seperti semula,
+    // tidak ada delay paint tambahan.
+    restoreSession().then(() => {
+      navigate("/home");
+      initRouter(contentOutlet);
+    });
+  } else {
+    restoreSession(); // fire-and-forget, tidak menunda paint pertama
+    initRouter(contentOutlet);
+  }
 }
 
 document.addEventListener("DOMContentLoaded", main);

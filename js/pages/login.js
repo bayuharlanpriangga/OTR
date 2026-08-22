@@ -1,14 +1,17 @@
 // OTR — Page: Login (Phase 13 — Authentication, Roadmap Phase 13, Master Spec §47)
-// Email + Password saja (MVP auth per §47 -- Google/Apple/Magic Link "Future").
-// Setelah sign-in sukses: sinkronkan state.user, jalankan Guest Migration
-// kalau ada data tamu, lalu navigasi ke Home.
+// Email + Password, plus Google OAuth (§47 menandai Google sebagai "Future"
+// tanpa mengikatnya ke nomor phase manapun -- ditambah di luar urutan phase
+// numbered, bukan mendahului fase yang sudah dijadwalkan; lihat auth-service.js).
+// Setelah sign-in sukses (baik email maupun Google): sinkronkan state.user,
+// jalankan Guest Migration kalau ada data tamu, lalu navigasi ke Home.
 
-import { signInWithEmail } from "../services/auth-service.js";
+import { signInWithEmail, signInWithGoogle } from "../services/auth-service.js";
 import { migrateGuestDataToCloud } from "../services/migration-service.js";
 import { setState } from "../core/state.js";
 import { navigate } from "../router.js";
 import { showToast } from "../components/toast.js";
 import { listGuestReadings } from "../core/storage.js";
+import { googleIcon } from "../components/icons.js";
 
 function focusHeading(container) {
   const heading = container.querySelector("h1, h2");
@@ -43,6 +46,17 @@ function template() {
         }
       </div>
 
+      <div class="stack gap-4">
+        <button type="button" class="btn btn--secondary btn--full row gap-2" style="justify-content:center; align-items:center;" data-google-btn>
+          ${googleIcon(18)} Lanjutkan dengan Google
+        </button>
+        <div class="row gap-3" style="align-items:center;">
+          <span style="flex:1; height:1px; background:var(--otr-gold-dim);"></span>
+          <span class="text-sm text-muted">atau</span>
+          <span style="flex:1; height:1px; background:var(--otr-gold-dim);"></span>
+        </div>
+      </div>
+
       <form class="stack gap-4" data-login-form novalidate>
         <label class="stack gap-2">
           <span class="text-sm">Email</span>
@@ -75,6 +89,20 @@ export default {
     const form = container.querySelector("[data-login-form]");
     const errorEl = container.querySelector("[data-login-error]");
     const submitBtn = container.querySelector("[data-login-submit]");
+    const googleBtn = container.querySelector("[data-google-btn]");
+
+    googleBtn?.addEventListener("click", async () => {
+      googleBtn.disabled = true;
+      const { error } = await signInWithGoogle();
+      // Sukses TIDAK sampai sini -- signInWithGoogle() langsung me-redirect
+      // browser ke Google. Kalau kode lanjut jalan berarti gagal (mis.
+      // provider belum aktif di Dashboard, atau popup/redirect diblokir).
+      if (error) {
+        googleBtn.disabled = false;
+        errorEl.textContent = error.message || "Gagal membuka Google Sign-In. Coba lagi.";
+        errorEl.style.display = "block";
+      }
+    });
 
     form?.addEventListener("submit", async (e) => {
       e.preventDefault();

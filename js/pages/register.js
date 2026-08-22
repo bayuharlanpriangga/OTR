@@ -1,6 +1,10 @@
 // OTR — Page: Register (Phase 13 — Authentication, Roadmap Phase 13, Master Spec §47)
 // Email + Password (+ display name opsional, disimpan lewat auth metadata ->
 // trigger handle_new_user() Phase 12 yang auto-insert baris profiles).
+// Plus Google OAuth (lihat catatan §47 "Future" di login.js/auth-service.js
+// -- sama-sama berlaku di sini). Google skip alur "Confirm email" di bawah
+// sepenuhnya (Supabase treat email dari Google sebagai sudah terverifikasi),
+// jadi selalu dapat session langsung.
 //
 // Supabase project bisa dikonfigurasi wajib konfirmasi email atau tidak
 // ("Confirm email" toggle di Dashboard) -- signUp() mengembalikan session
@@ -12,12 +16,13 @@
 //     (belum authenticated), user migrasi nanti otomatis saat login.js
 //     dipanggil pertama kali setelah konfirmasi.
 
-import { signUpWithEmail } from "../services/auth-service.js";
+import { signUpWithEmail, signInWithGoogle } from "../services/auth-service.js";
 import { migrateGuestDataToCloud } from "../services/migration-service.js";
 import { setState } from "../core/state.js";
 import { navigate } from "../router.js";
 import { showToast } from "../components/toast.js";
 import { listGuestReadings } from "../core/storage.js";
+import { googleIcon } from "../components/icons.js";
 
 function focusHeading(container) {
   const heading = container.querySelector("h1, h2");
@@ -48,6 +53,17 @@ function template() {
             ? `<p class="text-sm text-muted">Kamu punya ${guestCount} reading tersimpan sebagai tamu di perangkat ini — daftar untuk memindahkannya ke akunmu.</p>`
             : ""
         }
+      </div>
+
+      <div class="stack gap-4">
+        <button type="button" class="btn btn--secondary btn--full row gap-2" style="justify-content:center; align-items:center;" data-google-btn>
+          ${googleIcon(18)} Daftar dengan Google
+        </button>
+        <div class="row gap-3" style="align-items:center;">
+          <span style="flex:1; height:1px; background:var(--otr-gold-dim);"></span>
+          <span class="text-sm text-muted">atau</span>
+          <span style="flex:1; height:1px; background:var(--otr-gold-dim);"></span>
+        </div>
       </div>
 
       <form class="stack gap-4" data-register-form novalidate>
@@ -90,6 +106,19 @@ export default {
     const errorEl = container.querySelector("[data-register-error]");
     const successEl = container.querySelector("[data-register-success]");
     const submitBtn = container.querySelector("[data-register-submit]");
+    const googleBtn = container.querySelector("[data-google-btn]");
+
+    googleBtn?.addEventListener("click", async () => {
+      googleBtn.disabled = true;
+      const { error } = await signInWithGoogle();
+      // Sama seperti login.js -- sukses langsung redirect, jadi lanjut
+      // ke sini berarti gagal.
+      if (error) {
+        googleBtn.disabled = false;
+        errorEl.textContent = error.message || "Gagal membuka Google Sign-In. Coba lagi.";
+        errorEl.style.display = "block";
+      }
+    });
 
     form?.addEventListener("submit", async (e) => {
       e.preventDefault();
