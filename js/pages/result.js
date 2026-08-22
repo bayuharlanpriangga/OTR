@@ -32,11 +32,12 @@ import { getCardById } from "../../data/tarot-cards.js";
 import { interpretCard, synthesizeReading } from "../tarot/interpretation.js";
 import { tarotCardHTML } from "../components/tarot-card.js";
 import { emptyStateHTML } from "../components/empty-state.js";
+import { journalEditorHTML, bindJournalEditor } from "../components/journal-editor.js";
 import { showToast } from "../components/toast.js";
 import { navigate } from "../router.js";
 import { icon } from "../components/icons.js";
 import { formatDate } from "../core/utils.js";
-import { saveGuestReading, getGuestReadingById } from "../core/storage.js";
+import { saveGuestReading, getGuestReadingById, getGuestJournalByReadingId, saveGuestJournalEntry } from "../core/storage.js";
 
 const CATEGORY_LABELS = {
   general: "Umum",
@@ -161,6 +162,12 @@ function renderResult(container, reading) {
   });
 
   const alreadySaved = Boolean(getGuestReadingById(reading.id));
+  // Master Spec §81 (core flow): SAVE -> JOURNAL (OPTIONAL) -> HISTORY —
+  // journal secara eksplisit datang SETELAH save di urutan flow, dan §25
+  // journal.readingId perlu menunjuk ke reading yang benar-benar ada supaya
+  // bisa dibuka lagi dari /journal. Makanya "Tulis Journal" digerbang di
+  // belakang "Simpan Reading", bukan auto-save saat diklik.
+  const existingJournal = getGuestJournalByReadingId(reading.id);
 
   container.innerHTML = `
     <section class="result-page stack gap-6">
@@ -210,8 +217,17 @@ function renderResult(container, reading) {
       <div class="result-section result-actions row gap-3" style="flex-wrap:wrap;">
         <button type="button" class="btn btn--primary" data-new-reading>${icon("sparkle", { size: 16 })} Reading Baru</button>
         <button type="button" class="btn btn--secondary" data-save-reading ${alreadySaved ? "disabled" : ""}>${icon("bookmark", { size: 16 })} <span data-save-label>${alreadySaved ? "Tersimpan" : "Simpan Reading"}</span></button>
-        <button type="button" class="btn btn--secondary" disabled title="Tersedia di Phase 11 (Journal)">${icon("feather", { size: 16 })} Tulis Journal</button>
+        <button
+          type="button"
+          class="btn btn--secondary"
+          data-write-journal
+          ${alreadySaved && !existingJournal ? "" : "disabled"}
+          ${alreadySaved ? "" : 'title="Simpan reading dulu sebelum menulis journal"'}
+          ${alreadySaved && existingJournal ? 'title="Sudah ada journal untuk reading ini — edit lewat halaman Journal"' : ""}
+        >${icon("feather", { size: 16 })} <span data-journal-btn-label>${existingJournal ? "Journal Tersimpan" : "Tulis Journal"}</span></button>
       </div>
+
+      <div data-journal-slot></div>
     </section>
   `;
 
@@ -221,6 +237,9 @@ function renderResult(container, reading) {
   });
 
   const saveBtn = container.querySelector("[data-save-reading]");
+  const journalBtn = container.querySelector("[data-write-journal]");
+  const journalSlot = container.querySelector("[data-journal-slot]");
+
   saveBtn?.addEventListener("click", () => {
     const record = buildSavedReading({ reading, spread, category, validEntries, synthesis });
     const ok = saveGuestReading(record);
@@ -232,6 +251,35 @@ function renderResult(container, reading) {
     const label = saveBtn.querySelector("[data-save-label]");
     if (label) label.textContent = "Tersimpan";
     showToast("Reading tersimpan. Bisa dibuka lagi lewat History.", "success");
+
+    // Reading baru saja tersimpan -> gerbang "Tulis Journal" terbuka.
+    if (journalBtn && !existingJournal) journalBtn.disabled = false;
+  });
+
+  journalBtn?.addEventListener("click", () => {
+    if (journalBtn.disabled) return;
+    journalSlot.innerHTML = journalEditorHTML({ saveLabel: "Simpan Journal" });
+    journalBtn.disabled = true;
+
+    bindJournalEditor(journalSlot, {
+      onSave: (content) => {
+        const saved = saveGuestJournalEntry({ readingId: reading.id, content });
+        if (!saved) {
+          showToast("Gagal menyimpan journal. Coba lagi.", "danger");
+          journalBtn.disabled = false;
+          return;
+        }
+        journalSlot.innerHTML = "";
+        const label = journalBtn.querySelector("[data-journal-btn-label]");
+        if (label) label.textContent = "Journal Tersimpan";
+        journalBtn.title = "Sudah ada journal untuk reading ini — edit lewat halaman Journal";
+        showToast("Journal disimpan.", "success");
+      },
+      onCancel: () => {
+        journalSlot.innerHTML = "";
+        journalBtn.disabled = false;
+      },
+    });
   });
 }
 

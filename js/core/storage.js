@@ -3,6 +3,8 @@
 // harus lewat sini supaya Phase 8/12 (local persistence -> Supabase)
 // tinggal ganti implementasi tanpa menyentuh pemanggilnya.
 
+import { uid } from "./utils.js";
+
 export function readJSON(key, fallback = null) {
   try {
     const raw = localStorage.getItem(key);
@@ -95,7 +97,17 @@ export function deleteGuestReading(id) {
   const all = listGuestReadings();
   const next = all.filter((r) => r.id !== id);
   if (next.length === all.length) return false; // tidak ada yang dihapus
-  return writeJSON(STORAGE_KEYS.READINGS, next);
+  const ok = writeJSON(STORAGE_KEYS.READINGS, next);
+  // Master Spec §43: `journals.reading_id references readings(id) on delete
+  // cascade`. Guest storage tidak punya FK sungguhan, jadi cascade-nya
+  // direplikasi manual di sini — kalau tidak, menghapus reading akan
+  // menyisakan journal entry yatim yang menunjuk ke reading yang sudah
+  // tidak ada (tidak bisa dibuka lagi dari mana pun, termasuk /journal).
+  if (ok) {
+    const orphanedJournal = getGuestJournalByReadingId(id);
+    if (orphanedJournal) deleteGuestJournalEntry(orphanedJournal.id);
+  }
+  return ok;
 }
 
 /** Skeleton untuk Phase 16 (Favorites) — sudah bisa dipanggil, belum ada
@@ -108,7 +120,12 @@ export function setGuestReadingFavorite(id, isFavorite) {
   return writeJSON(STORAGE_KEYS.READINGS, all);
 }
 
-// ---- Guest Journal (skeleton — CRUD penuh & UI di Phase 11) ----
+// ---- Guest Journal (Phase 11 — Journal, Master Spec §25) ----
+// Schema per §25: { id, readingId, userId, content, createdAt, updatedAt }.
+// userId belum dipakai di guest mode (konsisten dengan reading record dari
+// buildSavedReading() di result.js, yang juga tidak menyimpan userId untuk
+// guest — lihat Phase 8). "One reading may have one journal entry in MVP"
+// (§25) berarti kunci upsert-nya readingId, BUKAN journal.id sendiri.
 
 export function listGuestJournalEntries() {
   return readJSON(STORAGE_KEYS.JOURNAL, []) ?? [];
@@ -116,6 +133,34 @@ export function listGuestJournalEntries() {
 
 export function saveGuestJournalEntries(entries) {
   return writeJSON(STORAGE_KEYS.JOURNAL, entries);
+}
+
+export function getGuestJournalByReadingId(readingId) {
+  return listGuestJournalEntries().find((j) => j.readingId === readingId) ?? null;
+}
+
+/** Upsert by readingId (bukan by journal.id) — 1 reading = 1 journal entry
+ *  di MVP (§25). Entry lama (kalau ada) di-update content+updatedAt, id &
+ *  createdAt aslinya dipertahankan; entry baru dapat id dari uid("journal"). */
+export function saveGuestJournalEntry({ readingId, content }) {
+  const all = listGuestJournalEntries();
+  const idx = all.findIndex((j) => j.readingId === readingId);
+  const now = new Date().toISOString();
+
+  if (idx >= 0) {
+    all[idx] = { ...all[idx], content, updatedAt: now };
+  } else {
+    all.unshift({ id: uid("journal"), readingId, content, createdAt: now, updatedAt: now });
+  }
+
+  return writeJSON(STORAGE_KEYS.JOURNAL, all) ? getGuestJournalByReadingId(readingId) : null;
+}
+
+export function deleteGuestJournalEntry(id) {
+  const all = listGuestJournalEntries();
+  const next = all.filter((j) => j.id !== id);
+  if (next.length === all.length) return false;
+  return writeJSON(STORAGE_KEYS.JOURNAL, next);
 }
 
 // ---- Settings ----

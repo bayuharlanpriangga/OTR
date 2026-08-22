@@ -396,6 +396,17 @@ function showDrawStep(container, flow) {
   const interpretationEl = container.querySelector("[data-interpretation]");
   const drawBtn = container.querySelector("[data-draw-btn]");
 
+  // BUGFIX: tombol "Tarik Kartu" sebelumnya cuma dipakai buat toggle
+  // `disabled` (lihat handleDraw() di bawah), tidak pernah punya listener
+  // klik sendiri — jadi terlihat seperti CTA utama tapi diam saja saat
+  // diklik. Satu-satunya cara draw sebelumnya adalah klik kartu face-down
+  // (renderTarotCard onClick di bawah). Sekarang keduanya memanggil
+  // handleDraw() yang sama, sesuai mockup Master Spec §18 ("Draw Card" ->
+  // klik -> kartu langsung terungkap) — bukan diganti nama jadi "Buka",
+  // karena satu klik ini menarik SEKALIGUS membuka kartu, bukan cuma
+  // membuka kartu yang sudah ditarik duluan.
+  drawBtn.addEventListener("click", () => handleDraw());
+
   container.querySelector("[data-cancel]")?.addEventListener("click", () => {
     confirmCancel(container, flow, () => showTypeStep(container, flow));
   });

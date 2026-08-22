@@ -1,5 +1,17 @@
 /* ==========================================================================
-   OTR — Journal styles
-   Placeholder — akan diisi di phase yang relevan.
-   Untuk saat ini, responsive rules app-shell ada di layout.css.
+   OTR — Journal styles (Phase 11 — Journal, Master Spec §25-26)
+   .card/.card--interactive/.btn generik dari components.css sudah cukup
+   untuk sebagian besar layout — file ini cuma untuk yang benar-benar
+   spesifik journal: line-clamp preview konten & spacing editor.
    ========================================================================== */
+
+.journal-entry__content {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.journal-editor textarea {
+  min-height: 140px;
+}
