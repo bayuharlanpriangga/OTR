@@ -239,3 +239,44 @@
   background: rgba(122, 46, 58, 0.25);
   color: var(--otr-oxblood-bright);
 }
+
+/* ---- History toolbar & favorite toggle (Phase 10 — Reading History) ----
+   Tidak ada css/history.css sendiri: Master Spec §3 cuma daftar 12 file di
+   css/ dan history.css bukan salah satunya (history.js/history-detail.js
+   memang ada di js/pages/, tapi styling-nya sengaja digabung ke sini,
+   bukan bikin file baru di luar struktur yang didokumentasikan). List item
+   sendiri masih pakai .card/.card--interactive generik di atas. */
+.history-toolbar input[type="search"] {
+  width: 100%;
+}
+
+.history-filters select {
+  min-width: 160px;
+}
+
+@media (max-width: 640px) {
+  .history-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .history-filters select {
+    width: 100%;
+  }
+}
+
+/* Satu ikon stroke-only (konsisten dengan ikon lain di icons.js), "diisi"
+   (fill) begitu reading ditandai favorit lewat class .is-favorite — bukan
+   dua ikon terpisah untuk state on/off. */
+.history-favorite-btn svg {
+  transition: color var(--duration-fast) var(--ease-standard),
+              fill var(--duration-fast) var(--ease-standard);
+}
+
+.history-favorite-btn.is-favorite {
+  color: var(--otr-gold);
+}
+
+.history-favorite-btn.is-favorite svg {
+  fill: var(--otr-gold);
+}
