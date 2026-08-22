@@ -1,0 +1,12 @@
+{
+  "name": "otr-dev-scripts",
+  "private": true,
+  "type": "module",
+  "description": "Skrip Node dev-only (BUKAN bagian dari app yang di-deploy ke GitHub Pages -- app-nya sendiri murni static ES Modules, lihat index.html). Sejauh ini cuma dipakai untuk scripts/supabase-smoke-test.mjs (Phase 12).",
+  "scripts": {
+    "test:supabase": "node scripts/supabase-smoke-test.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.112.3"
+  }
+}
