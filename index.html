@@ -23,6 +23,20 @@
   <link rel="stylesheet" href="css/journal.css" />
   <link rel="stylesheet" href="css/animations.css" />
   <link rel="stylesheet" href="css/responsive.css" />
+
+  <!-- Phase 12 — Supabase Foundation. Proyek ini tidak pakai bundler (murni
+       ES Modules native browser, Master Spec §4), jadi @supabase/supabase-js
+       diimpor lewat import map ke build ESM di CDN esm.sh, bukan dari
+       node_modules. js/integrations/supabase.js tinggal
+       `import { createClient } from "@supabase/supabase-js"` seolah-olah
+       package itu ter-install lokal. -->
+  <script type="importmap">
+    {
+      "imports": {
+        "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2"
+      }
+    }
+  </script>
 </head>
 <body>
   <div id="app"></div>

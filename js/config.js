@@ -4,6 +4,9 @@
 export const APP_NAME = "OTR";
 export const APP_FULL_NAME = "Orias Tarot Reading";
 
+export const SUPABASE_URL = "https://yqbckinxvzjghbezypxc.supabase.co";
+export const SUPABASE_ANON_KEY = "sb_publishable_lt-XixE3Q5UrVA5g9mPkwg_ZRaJtRLe";
+
 export const STORAGE_KEYS = {
   GUEST_READINGS: "otr_guest_readings",
   GUEST_JOURNAL: "otr_guest_journal",
