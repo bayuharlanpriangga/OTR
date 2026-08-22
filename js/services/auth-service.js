@@ -20,6 +20,7 @@
 // sini, bukan proaktif dibuat dari awal untuk semua domain.
 
 import { getSupabaseClient } from "../integrations/supabase.js";
+import { SITE_URL } from "../config.js";
 
 /** @returns {Promise<{data: {user: object|null, session: object|null}, error: object|null}>} */
 export async function signUpWithEmail(email, password, { displayName } = {}) {
@@ -27,7 +28,12 @@ export async function signUpWithEmail(email, password, { displayName } = {}) {
   return supabase.auth.signUp({
     email,
     password,
-    options: displayName ? { data: { display_name: displayName } } : undefined,
+    options: {
+      // Tanpa ini, Supabase fallback ke "Site URL" default project (localhost)
+      // untuk link konfirmasi di email -- lihat catatan di config.js.
+      emailRedirectTo: SITE_URL,
+      ...(displayName ? { data: { display_name: displayName } } : {}),
+    },
   });
 }
 
@@ -70,13 +76,19 @@ export function onAuthStateChange(callback) {
 
 /**
  * Phase 13 — Authentication (Roadmap Phase 13). Kirim email reset password
- * lewat Supabase Auth (dipakai halaman Forgot Password). Tidak perlu
- * redirectTo custom -- app ini hash-routed & belum punya halaman
- * "set new password" terpisah, jadi dibiarkan default Supabase (link di
- * email membawa user ke Supabase-hosted flow / redirect default project).
+ * lewat Supabase Auth (dipakai halaman Forgot Password).
+ *
+ * redirectTo diisi eksplisit ke SITE_URL supaya link di email tidak fallback
+ * ke Site URL default project (localhost) -- bug yang sama dengan signUp
+ * di atas. CATATAN: app ini BELUM punya halaman "set new password" terpisah
+ * (lihat komentar lama, masih relevan) -- link recovery akan mendarat di
+ * SITE_URL dan (lewat detectSessionInUrl bawaan supabase-js) langsung
+ * membuat sesi ter-recover, tapi tidak ada UI yang memicu
+ * supabase.auth.updateUser({ password }) sesudahnya. Itu scope terpisah,
+ * bukan bagian dari fix redirectTo ini.
  * @returns {Promise<{data: object, error: object|null}>}
  */
 export async function resetPasswordForEmail(email) {
   const supabase = getSupabaseClient();
-  return supabase.auth.resetPasswordForEmail(email);
+  return supabase.auth.resetPasswordForEmail(email, { redirectTo: SITE_URL });
 }

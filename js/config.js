@@ -7,6 +7,12 @@ export const APP_FULL_NAME = "Orias Tarot Reading";
 export const SUPABASE_URL = "https://yqbckinxvzjghbezypxc.supabase.co";
 export const SUPABASE_ANON_KEY = "sb_publishable_lt-XixE3Q5UrVA5g9mPkwg_ZRaJtRLe";
 
+// URL produksi app ini (GitHub Pages). Dipakai sebagai redirectTo/emailRedirectTo
+// di auth-service.js supaya link konfirmasi signup & reset password Supabase
+// mengarah ke sini, bukan fallback ke Site URL default project (localhost).
+// Kalau app pindah domain/path, cukup ganti nilai ini SAJA.
+export const SITE_URL = "https://bayuharlanpriangga.github.io/OTR/";
+
 export const STORAGE_KEYS = {
   GUEST_READINGS: "otr_guest_readings",
   GUEST_JOURNAL: "otr_guest_journal",
