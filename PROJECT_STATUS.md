@@ -67,7 +67,7 @@ Phase 10 — Reading History
 - (tidak ada — Phase 8 selesai, menunggu smoke test manual sebelum lanjut)
 
 ## Not Started
-- Semua phase 9–27
+- Semua phase 11–27
 
 ## Current Architecture
 - Vanilla HTML/CSS/JS, ES Modules, tanpa framework/build step.
