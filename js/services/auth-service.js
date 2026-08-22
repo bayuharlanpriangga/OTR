@@ -67,3 +67,16 @@ export function onAuthStateChange(callback) {
   } = supabase.auth.onAuthStateChange(callback);
   return () => subscription.unsubscribe();
 }
+
+/**
+ * Phase 13 — Authentication (Roadmap Phase 13). Kirim email reset password
+ * lewat Supabase Auth (dipakai halaman Forgot Password). Tidak perlu
+ * redirectTo custom -- app ini hash-routed & belum punya halaman
+ * "set new password" terpisah, jadi dibiarkan default Supabase (link di
+ * email membawa user ke Supabase-hosted flow / redirect default project).
+ * @returns {Promise<{data: object, error: object|null}>}
+ */
+export async function resetPasswordForEmail(email) {
+  const supabase = getSupabaseClient();
+  return supabase.auth.resetPasswordForEmail(email);
+}
