@@ -27,13 +27,37 @@ function escapeHTML(str = "") {
   return String(str).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+/**
+ * Nama tampilan akun untuk section "Akun" di Settings. Prioritas:
+ *  1. user_metadata.display_name -- diisi eksplisit oleh register.js
+ *     (form Email/Password kita sendiri, field "Nama Tampilan").
+ *  2. user_metadata.full_name / user_metadata.name -- diisi OTOMATIS oleh
+ *     Supabase dari profil Google saat sign-in via signInWithGoogle()
+ *     (auth-service.js). Google TIDAK pernah mengisi display_name, jadi
+ *     tanpa fallback ini label jatuh ke email mentah.
+ *  3. Bagian sebelum "@" di email -- fallback terakhir kalau user_metadata
+ *     kosong sama sekali (mis. provider lain di masa depan yang tidak
+ *     mengirim nama). Sengaja BUKAN cuma motong string email dengan batas
+ *     karakter -- itu bisa memotong nama asli di tengah kalau providernya
+ *     memang tidak kirim nama & email-nya kebetulan panjang.
+ *  4. "Akun" -- fallback terakhir kalau bahkan email tidak ada.
+ */
+function getAccountLabel(user) {
+  const meta = user.user_metadata || {};
+  if (meta.display_name) return meta.display_name;
+  if (meta.full_name) return meta.full_name;
+  if (meta.name) return meta.name;
+  if (user.email) return user.email.split("@")[0];
+  return "Akun";
+}
+
 // Phase 13 — Authentication. Status login & tombol Logout ditaruh di sini
 // (BUKAN di js/pages/profile.js -- itu skeleton yang sengaja ditandai
 // "Phase 18" di komentarnya sendiri, lihat PROJECT_STATUS.md "Next Phase"
 // Phase 12).
 function accountSectionHTML(user) {
   if (user) {
-    const label = user.user_metadata?.display_name || user.email || "Akun";
+    const label = getAccountLabel(user);
     return `
       <div class="card stack gap-4">
         <div class="row gap-4" style="justify-content:space-between; align-items:center;">
