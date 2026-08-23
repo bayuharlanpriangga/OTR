@@ -7,6 +7,12 @@
 
 import { signInWithEmail, signInWithGoogle } from "../services/auth-service.js";
 import { migrateGuestDataToCloud } from "../services/migration-service.js";
+// Phase 14 — Cloud Sync: sinkronkan Reduced Motion ke/dari cloud tepat
+// setelah login sukses (BUKAN nunggu buka Settings dulu) — pola yang sama
+// dengan Guest Migration di bawah: dipicu eksplisit sekali dari sini, bukan
+// dari subscribeAuthChanges() di app.js (lihat komentar migration-service.js
+// soal kenapa).
+import { syncFromCloud, applyMotionPreference } from "../services/settings-service.js";
 import { setState } from "../core/state.js";
 import { navigate } from "../router.js";
 import { showToast } from "../components/toast.js";
@@ -128,6 +134,14 @@ export default {
       const user = signInData?.user ?? null;
       setState({ user });
       showToast(`Selamat datang kembali${user?.email ? ", " + user.email : ""}.`, "success");
+
+      if (user?.id) {
+        syncFromCloud(user.id)
+          .then(({ settings, changed }) => {
+            if (changed) applyMotionPreference(settings);
+          })
+          .catch((err) => console.warn("[login] gagal menyinkronkan settings dari cloud", err));
+      }
 
       // Guest Migration (Master Spec §48) -- cuma jalan kalau memang ada
       // reading tamu tersimpan. Kegagalan migrasi TIDAK membatalkan login

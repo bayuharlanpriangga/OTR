@@ -12,7 +12,8 @@
 // History terasa satu bahasa visual yang sama — bedanya cuma sumber data
 // (live interpretCard() vs snapshot beku) dan action band di bagian bawah.
 
-import { getGuestReadingById, deleteGuestReading } from "../core/storage.js";
+// Phase 14 — Cloud Sync: sebelumnya import langsung dari core/storage.js.
+import { getReadingById, deleteReading } from "../services/reading-service.js";
 import { getCardById } from "../../data/tarot-cards.js";
 import { tarotCardHTML } from "../components/tarot-card.js";
 import { emptyStateHTML } from "../components/empty-state.js";
@@ -166,9 +167,11 @@ function renderDetail(container, reading) {
   `;
 
   container.querySelector("[data-delete-reading]")?.addEventListener("click", () => {
-    confirmDelete(() => {
-      const ok = deleteGuestReading(reading.id);
-      if (!ok) {
+    confirmDelete(async () => {
+      try {
+        await deleteReading(reading.id);
+      } catch (err) {
+        console.error("[history-detail] gagal menghapus reading", err);
         showToast("Gagal menghapus reading.", "danger");
         return;
       }
@@ -179,8 +182,20 @@ function renderDetail(container, reading) {
 }
 
 export default {
-  render(container, params = {}) {
-    const reading = getGuestReadingById(params.readingId);
+  async render(container, params = {}) {
+    // Phase 14: getReadingById() bisa berupa network call (cloud) —
+    // spinner dulu supaya halaman tidak kosong selama menunggu.
+    container.innerHTML = `<div class="row" style="justify-content:center; padding:var(--space-8) 0;"><span class="spinner" aria-label="Memuat"></span></div>`;
+
+    let reading;
+    try {
+      reading = await getReadingById(params.readingId);
+    } catch (err) {
+      console.error("[history-detail] gagal memuat reading", err);
+      showToast("Gagal menampilkan reading.", "danger");
+      renderNotFound(container);
+      return;
+    }
 
     if (!reading) {
       renderNotFound(container);

@@ -18,12 +18,14 @@ import { openModal, closeModal } from "../components/modal.js";
 import { showToast } from "../components/toast.js";
 import { icon } from "../components/icons.js";
 import { formatDate } from "../core/utils.js";
-import {
-  listGuestJournalEntries,
-  saveGuestJournalEntry,
-  deleteGuestJournalEntry,
-  getGuestReadingById,
-} from "../core/storage.js";
+// Phase 14 — Cloud Sync: sebelumnya import langsung dari core/storage.js.
+// listReadings() dipanggil SEKALI di render() (bareng listJournalEntries())
+// untuk membangun peta readingId -> reading dipakai entryHTML() me-resolve
+// judul/pertanyaan -- bukan getGuestReadingById() per entry seperti
+// sebelumnya, supaya tidak perlu N network call terpisah kalau backend-nya
+// cloud (lihat renderList() di export default di bawah).
+import { listJournalEntries, saveJournalEntry, deleteJournalEntry } from "../services/journal-service.js";
+import { listReadings } from "../services/reading-service.js";
 
 function escapeHTML(str = "") {
   return String(str)
@@ -37,8 +39,8 @@ function sortByUpdatedDesc(entries) {
   return [...entries].sort((a, b) => new Date(b.updatedAt ?? 0) - new Date(a.updatedAt ?? 0));
 }
 
-function entryHTML(entry) {
-  const reading = getGuestReadingById(entry.readingId);
+function entryHTML(entry, readingsById) {
+  const reading = readingsById.get(entry.readingId) ?? null;
 
   return `
     <div class="card journal-entry stack gap-3" data-journal-item="${escapeHTML(entry.id)}">
@@ -105,15 +107,30 @@ function confirmDelete(onConfirm) {
 }
 
 export default {
-  render(container) {
-    let entries = sortByUpdatedDesc(listGuestJournalEntries());
+  async render(container) {
+    // Phase 14: listJournalEntries()/listReadings() bisa berupa network call
+    // (cloud) — spinner dulu supaya halaman tidak kosong selama menunggu.
+    container.innerHTML = `<div class="row" style="justify-content:center; padding:var(--space-8) 0;"><span class="spinner" aria-label="Memuat"></span></div>`;
+
+    let entries;
+    let readingsById;
+    try {
+      const [journalEntries, readings] = await Promise.all([listJournalEntries(), listReadings()]);
+      entries = sortByUpdatedDesc(journalEntries);
+      readingsById = new Map(readings.map((r) => [r.id, r]));
+    } catch (err) {
+      console.error("[journal] gagal memuat journal", err);
+      showToast("Gagal memuat journal.", "danger");
+      entries = [];
+      readingsById = new Map();
+    }
 
     container.innerHTML = template(entries);
     const listEl = container.querySelector("[data-journal-list]");
 
     function renderList() {
       listEl.innerHTML = entries.length
-        ? `<div class="stack gap-3">${entries.map(entryHTML).join("")}</div>`
+        ? `<div class="stack gap-3">${entries.map((entry) => entryHTML(entry, readingsById)).join("")}</div>`
         : emptyStateHTML({
             // Master Spec §65 (Empty States — Journal), diterjemahkan.
             title: "Belum ada journal",
@@ -136,9 +153,12 @@ export default {
 
         slot.innerHTML = journalEditorHTML({ content: entry.content, saveLabel: "Simpan Perubahan" });
         bindJournalEditor(slot, {
-          onSave: (content) => {
-            const saved = saveGuestJournalEntry({ readingId: entry.readingId, content });
-            if (!saved) {
+          onSave: async (content) => {
+            let saved;
+            try {
+              saved = await saveJournalEntry({ readingId: entry.readingId, content });
+            } catch (err) {
+              console.error("[journal] gagal menyimpan journal", err);
               showToast("Gagal menyimpan journal. Coba lagi.", "danger");
               return;
             }
@@ -158,9 +178,11 @@ export default {
       if (delBtn) {
         e.preventDefault();
         const id = delBtn.dataset.deleteJournal;
-        confirmDelete(() => {
-          const ok = deleteGuestJournalEntry(id);
-          if (!ok) {
+        confirmDelete(async () => {
+          try {
+            await deleteJournalEntry(id);
+          } catch (err) {
+            console.error("[journal] gagal menghapus journal", err);
             showToast("Gagal menghapus journal.", "danger");
             return;
           }

@@ -3,7 +3,10 @@
 import { mountAppShell } from "./components/app-shell.js";
 import { initRouter, registerRoute, navigate } from "./router.js";
 import { initToasts } from "./components/toast.js";
-import { getSettings } from "./core/storage.js";
+// Phase 14 — Cloud Sync: getSettings tetap baca cache lokal (sinkron, buat
+// paint pertama SEBELUM ada sesi manapun dipulihkan) — syncFromCloud dipakai
+// terpisah di bawah, SESUDAH sesi user diketahui.
+import { getSettings, syncFromCloud, applyMotionPreference } from "./services/settings-service.js";
 import { setState } from "./core/state.js";
 import { getCurrentUser, onAuthStateChange } from "./services/auth-service.js";
 
@@ -31,17 +34,32 @@ function registerRoutes() {
  *  ([data-reduced-motion="true"] di reset.css/variables.css/reading.css)
  *  aktif sejak paint pertama — bukan cuma habis Settings page dibuka. */
 function applyStoredMotionPreference() {
-  const { reducedMotion } = getSettings();
-  document.documentElement.dataset.reducedMotion = String(Boolean(reducedMotion));
+  applyMotionPreference(getSettings());
 }
 
 /** Session Persistence (Phase 13, Master Spec §47) — pulihkan sesi Supabase
  *  yang tersimpan (kalau ada) ke state.user.
+ *
+ *  Phase 14: kalau sesi ditemukan, settings cloud ditarik/di-upload SESUDAH
+ *  itu (fire-and-forget, tidak menunda apa pun di sini) -- supaya user yang
+ *  buka app dengan sesi lama tersimpan (bukan baru saja login lewat
+ *  login.js/register.js, yang sudah memanggil ini sendiri) tetap dapat
+ *  preferensi terbaru kalau sempat diubah dari device lain. Kegagalan sync
+ *  cuma di-log, TIDAK memblokir apa pun -- motion preference dari cache
+ *  lokal (applyStoredMotionPreference() di atas) tetap berlaku sampai sync
+ *  ini (kalau berhasil & ada bedanya) menimpanya.
  */
 async function restoreSession() {
   try {
     const user = await getCurrentUser();
     setState({ user });
+    if (user?.id) {
+      syncFromCloud(user.id)
+        .then(({ settings, changed }) => {
+          if (changed) applyMotionPreference(settings);
+        })
+        .catch((err) => console.warn("[app] gagal menyinkronkan settings dari cloud", err));
+    }
   } catch (err) {
     console.warn("[app] gagal memulihkan sesi Supabase", err);
   }

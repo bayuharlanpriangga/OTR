@@ -16,12 +16,17 @@
 // per-item, mengikuti pola activateFromEvent() di library.js) supaya tidak
 // perlu reattach listener tiap kali [data-history-list] di-render ulang.
 
-import { listGuestReadings, deleteGuestReading, setGuestReadingFavorite } from "../core/storage.js";
+// Phase 14 — Cloud Sync: sebelumnya import langsung dari core/storage.js.
+// Sekarang lewat reading-service.js, yang otomatis baca dari Supabase kalau
+// user login (lihat komentar di service itu) -- guest tetap localStorage,
+// tidak ada perubahan perilaku buat user yang belum login.
+import { listReadings, deleteReading, setReadingFavorite } from "../services/reading-service.js";
 import { emptyStateHTML } from "../components/empty-state.js";
 import { openModal, closeModal } from "../components/modal.js";
 import { showToast } from "../components/toast.js";
 import { icon } from "../components/icons.js";
 import { formatDate, debounce } from "../core/utils.js";
+import { getState } from "../core/state.js";
 
 const CATEGORY_LABELS = {
   general: "Umum",
@@ -176,12 +181,16 @@ function readingItemHTML(reading) {
 }
 
 function template(state, totalCount) {
+  // Phase 14: label berubah tergantung sumber data -- "perangkat ini"
+  // (guest, localStorage) vs "akunmu" (login, Supabase) -- supaya tidak
+  // menyesatkan sekarang reading bisa disinkronkan lintas device.
+  const isCloud = Boolean(getState().user);
   return `
     <section class="stack gap-5">
       <div>
         <p class="eyebrow">History</p>
         <h1 class="font-display">Riwayat Reading</h1>
-        ${totalCount ? `<p class="text-sm text-muted">${totalCount} reading tersimpan di perangkat ini.</p>` : ""}
+        ${totalCount ? `<p class="text-sm text-muted">${totalCount} reading tersimpan di ${isCloud ? "akunmu" : "perangkat ini"}.</p>` : ""}
       </div>
 
       ${
@@ -230,13 +239,27 @@ function confirmDelete(id, onConfirm) {
 }
 
 export default {
-  render(container) {
+  async render(container) {
     const state = { search: "", filter: "all", sort: "newest" };
-    // Diambil sekali dari storage, lalu dimutasi lokal saat favorite/delete
-    // berhasil — supaya renderList() tidak perlu baca ulang localStorage
-    // tiap keystroke di search box (sumber kebenaran tetap storage.js, cuma
-    // dibaca ulang di titik yang jelas: awal render() ini saja).
-    let baseReadings = listGuestReadings();
+
+    // Phase 14: listReadings() bisa berupa network call (cloud) — tampilkan
+    // spinner dulu supaya halaman tidak kosong selama menunggu. Guest tetap
+    // resolve instan lewat microtask (localStorage), jadi spinner ini
+    // praktis tidak sempat kelihatan di jalur itu.
+    container.innerHTML = `<div class="row" style="justify-content:center; padding:var(--space-8) 0;"><span class="spinner" aria-label="Memuat"></span></div>`;
+
+    // Diambil sekali dari service, lalu dimutasi lokal saat favorite/delete
+    // berhasil — supaya renderList() tidak perlu fetch ulang tiap keystroke
+    // di search box (sumber kebenaran tetap service, cuma dibaca ulang di
+    // titik yang jelas: awal render() ini saja).
+    let baseReadings;
+    try {
+      baseReadings = await listReadings();
+    } catch (err) {
+      console.error("[history] gagal memuat riwayat reading", err);
+      showToast("Gagal memuat riwayat reading.", "danger");
+      baseReadings = [];
+    }
 
     container.innerHTML = template(state, baseReadings.length);
 
@@ -289,7 +312,7 @@ export default {
       renderList();
     });
 
-    container.addEventListener("click", (e) => {
+    container.addEventListener("click", async (e) => {
       const favBtn = e.target.closest("[data-favorite-reading]");
       if (favBtn) {
         e.preventDefault();
@@ -297,8 +320,10 @@ export default {
         const target = baseReadings.find((r) => r.id === id);
         if (!target) return;
         const next = !target.isFavorite;
-        const ok = setGuestReadingFavorite(id, next);
-        if (!ok) {
+        try {
+          await setReadingFavorite(id, next);
+        } catch (err) {
+          console.error("[history] gagal memperbarui favorit", err);
           showToast("Gagal memperbarui favorit.", "danger");
           return;
         }
@@ -311,9 +336,11 @@ export default {
       if (delBtn) {
         e.preventDefault();
         const id = delBtn.dataset.deleteReading;
-        confirmDelete(id, () => {
-          const ok = deleteGuestReading(id);
-          if (!ok) {
+        confirmDelete(id, async () => {
+          try {
+            await deleteReading(id);
+          } catch (err) {
+            console.error("[history] gagal menghapus reading", err);
             showToast("Gagal menghapus reading.", "danger");
             return;
           }

@@ -18,6 +18,10 @@
 
 import { signUpWithEmail, signInWithGoogle } from "../services/auth-service.js";
 import { migrateGuestDataToCloud } from "../services/migration-service.js";
+// Phase 14 — Cloud Sync: lihat komentar yang sama di login.js. Untuk akun
+// baru, syncFromCloud() akan mengambil jalur "belum ada baris cloud" --
+// meng-upload cache lokal (settings default/guest) sebagai titik awal.
+import { syncFromCloud, applyMotionPreference } from "../services/settings-service.js";
 import { setState } from "../core/state.js";
 import { navigate } from "../router.js";
 import { showToast } from "../components/toast.js";
@@ -169,6 +173,14 @@ export default {
 
       setState({ user });
       showToast("Akun berhasil dibuat.", "success");
+
+      if (user?.id) {
+        syncFromCloud(user.id)
+          .then(({ settings, changed }) => {
+            if (changed) applyMotionPreference(settings);
+          })
+          .catch((err) => console.warn("[register] gagal menyinkronkan settings ke cloud", err));
+      }
 
       if (user?.id && listGuestReadings().length > 0) {
         const result = await migrateGuestDataToCloud(user.id);

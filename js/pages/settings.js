@@ -17,7 +17,11 @@
 //     jeda draw/shuffle)
 // jadi nggak perlu reload halaman buat lihat efeknya.
 
-import { getSettings, saveSettings, isAvailable } from "../core/storage.js";
+import { isAvailable } from "../core/storage.js";
+// Phase 14 — Cloud Sync: getSettings/saveSettings sekarang lewat
+// settings-service.js (cache lokal + upload/tarik ke `user_settings` kalau
+// login — lihat komentar di service itu), bukan langsung core/storage.js.
+import { getSettings, saveSettings, syncFromCloud, applyMotionPreference } from "../services/settings-service.js";
 import { showToast } from "../components/toast.js";
 import { getState, setState } from "../core/state.js";
 import { signOut } from "../services/auth-service.js";
@@ -144,17 +148,38 @@ function bindAccountSection(container) {
 
 export default {
   render(container) {
+    // Cache lokal dulu (instan, sinkron) supaya halaman tidak menunggu
+    // network sama sekali untuk paint pertama — perilaku Phase 8 dipertahankan
+    // apa adanya untuk guest DAN sebagai first-paint untuk user login.
     const settings = getSettings();
     const user = getState().user;
     container.innerHTML = template(settings, user);
 
     bindAccountSection(container);
 
-    container.querySelector("[data-reduced-motion-toggle]")?.addEventListener("change", (e) => {
+    const toggle = container.querySelector("[data-reduced-motion-toggle]");
+    toggle?.addEventListener("change", async (e) => {
       const checked = e.target.checked;
-      const saved = saveSettings({ reducedMotion: checked });
-      document.documentElement.dataset.reducedMotion = String(saved.reducedMotion);
+      const saved = await saveSettings({ reducedMotion: checked }, getState().user);
+      applyMotionPreference(saved);
       showToast(checked ? "Reduced motion diaktifkan." : "Reduced motion dimatikan.", "default");
     });
+
+    // Phase 14: kalau user login, tarik/upload settings cloud DI BELAKANG
+    // paint pertama (bukan memblokirnya) -- kalau ternyata nilainya beda
+    // dari cache lokal (mis. diubah dari device lain), toggle & motion
+    // preference di-update tanpa reload. Guest dilewati sama sekali (tidak
+    // ada `user_settings` buat guest).
+    if (user?.id) {
+      syncFromCloud(user.id)
+        .then(({ settings: synced, changed }) => {
+          if (!changed) return;
+          applyMotionPreference(synced);
+          if (toggle) toggle.checked = Boolean(synced.reducedMotion);
+        })
+        .catch((err) => {
+          console.warn("[settings] gagal menyinkronkan settings dari cloud", err);
+        });
+    }
   },
 };

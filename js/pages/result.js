@@ -37,7 +37,14 @@ import { showToast } from "../components/toast.js";
 import { navigate } from "../router.js";
 import { icon } from "../components/icons.js";
 import { formatDate } from "../core/utils.js";
-import { saveGuestReading, getGuestReadingById, getGuestJournalByReadingId, saveGuestJournalEntry } from "../core/storage.js";
+// Phase 14 — Cloud Sync: sebelumnya import langsung dari core/storage.js
+// (selalu localStorage). Sekarang lewat reading-service.js/journal-service.js,
+// yang memilih Supabase alih-alih localStorage kalau state.user ada isinya
+// (lihat komentar di masing-masing service). Guest (belum login) berperilaku
+// PERSIS sama seperti sebelumnya -- kedua service fallback ke fungsi
+// core/storage.js yang sama saat state.user null.
+import { saveReading, getReadingById } from "../services/reading-service.js";
+import { getJournalByReadingId, saveJournalEntry } from "../services/journal-service.js";
 
 const CATEGORY_LABELS = {
   general: "Umum",
@@ -132,7 +139,27 @@ function buildSavedReading({ reading, spread, category, validEntries, synthesis 
   };
 }
 
-function renderResult(container, reading) {
+// Phase 14: alreadySaved/existingJournal sekarang butuh network call kalau
+// user login (cloud), jadi harus di-resolve SEBELUM template di-render --
+// beda dari sebelumnya (Phase 7) yang murni baca localStorage secara
+// sinkron. Fungsi ini murni penyiapan data, TIDAK menyentuh DOM, supaya
+// gampang di-`await` dari render() sebelum renderResult() dipanggil.
+async function resolveSaveState(reading) {
+  // Result Page cuma bisa diakses tepat setelah reading baru selesai di
+  // sesi browser yang sama (dibaca dari state, lihat Known Issues Phase 8)
+  // -- reading.id di titik ini masih id sementara dari tarot-engine.js,
+  // BUKAN id cloud (yang baru ada setelah saveReading() dipanggil). Jadi
+  // "sudah tersimpan" di sini secara praktis SELALU false pada kunjungan
+  // pertama; getReadingById() dipanggil tetap sebagai jaga-jaga (mis. race
+  // dobel klik Simpan) tanpa mengasumsikan hasilnya.
+  const [existingReading, existingJournal] = await Promise.all([
+    getReadingById(reading.id).catch(() => null),
+    getJournalByReadingId(reading.id).catch(() => null),
+  ]);
+  return { alreadySaved: Boolean(existingReading), existingJournal };
+}
+
+function renderResult(container, reading, { alreadySaved: initialAlreadySaved, existingJournal }) {
   const spread = getSpreadById(reading.spreadId);
 
   if (!spread) {
@@ -161,13 +188,19 @@ function renderResult(container, reading) {
     question: reading.question ?? "",
   });
 
-  const alreadySaved = Boolean(getGuestReadingById(reading.id));
+  const alreadySaved = initialAlreadySaved;
   // Master Spec §81 (core flow): SAVE -> JOURNAL (OPTIONAL) -> HISTORY —
   // journal secara eksplisit datang SETELAH save di urutan flow, dan §25
   // journal.readingId perlu menunjuk ke reading yang benar-benar ada supaya
   // bisa dibuka lagi dari /journal. Makanya "Tulis Journal" digerbang di
   // belakang "Simpan Reading", bukan auto-save saat diklik.
-  const existingJournal = getGuestJournalByReadingId(reading.id);
+
+  // Phase 14: id reading yang benar-benar dipakai buat saveJournalEntry()/
+  // navigasi berikutnya -- diganti ke id CLOUD begitu saveReading() sukses
+  // (lihat handler tombol Simpan di bawah), karena Supabase men-generate
+  // id barunya sendiri (beda dari id sementara reading.id di sini, lihat
+  // komentar reading-service.js).
+  let effectiveReadingId = reading.id;
 
   container.innerHTML = `
     <section class="result-page stack gap-6">
@@ -240,14 +273,21 @@ function renderResult(container, reading) {
   const journalBtn = container.querySelector("[data-write-journal]");
   const journalSlot = container.querySelector("[data-journal-slot]");
 
-  saveBtn?.addEventListener("click", () => {
+  saveBtn?.addEventListener("click", async () => {
     const record = buildSavedReading({ reading, spread, category, validEntries, synthesis });
-    const ok = saveGuestReading(record);
-    if (!ok) {
+    saveBtn.disabled = true;
+    try {
+      const saved = await saveReading(record);
+      // Phase 14: untuk cloud, `saved.id` adalah uuid BARU dari Supabase,
+      // beda dari `record.id`/`reading.id` -- journal & aksi berikutnya
+      // harus menunjuk ke id ini, bukan id sementara awal.
+      effectiveReadingId = saved.id;
+    } catch (err) {
+      saveBtn.disabled = false;
+      console.error("[result] gagal menyimpan reading", err);
       showToast("Gagal menyimpan reading. Coba lagi.", "danger");
       return;
     }
-    saveBtn.disabled = true;
     const label = saveBtn.querySelector("[data-save-label]");
     if (label) label.textContent = "Tersimpan";
     showToast("Reading tersimpan. Bisa dibuka lagi lewat History.", "success");
@@ -262,9 +302,11 @@ function renderResult(container, reading) {
     journalBtn.disabled = true;
 
     bindJournalEditor(journalSlot, {
-      onSave: (content) => {
-        const saved = saveGuestJournalEntry({ readingId: reading.id, content });
-        if (!saved) {
+      onSave: async (content) => {
+        try {
+          await saveJournalEntry({ readingId: effectiveReadingId, content });
+        } catch (err) {
+          console.error("[result] gagal menyimpan journal", err);
           showToast("Gagal menyimpan journal. Coba lagi.", "danger");
           journalBtn.disabled = false;
           return;
@@ -284,7 +326,7 @@ function renderResult(container, reading) {
 }
 
 export default {
-  render(container) {
+  async render(container) {
     const { reading } = getState();
 
     if (!reading || reading.status !== "completed" || !reading.spreadId) {
@@ -292,8 +334,15 @@ export default {
       return;
     }
 
+    // Phase 14: resolveSaveState() bisa berupa network call (cloud) --
+    // tampilkan spinner singkat dulu supaya halaman tidak terlihat kosong
+    // selama menunggu (fallback lokal/guest resolve instan lewat microtask,
+    // jadi spinner ini praktis tidak sempat kelihatan di jalur itu).
+    container.innerHTML = `<div class="row" style="justify-content:center; padding:var(--space-8) 0;"><span class="spinner" aria-label="Memuat"></span></div>`;
+
     try {
-      renderResult(container, reading);
+      const saveState = await resolveSaveState(reading);
+      renderResult(container, reading, saveState);
     } catch (err) {
       console.error("[result] failed to render reading", err);
       showToast("Gagal menampilkan hasil reading.", "danger");
