@@ -1,0 +1,68 @@
+/* ==========================================================================
+   OTR — Daily Card styles (Phase 15 — Daily Card)
+   Struktur DOM di-generate dari js/pages/daily.js. Reuse besar-besaran dari
+   reading.css untuk elemen yang secara visual identik dengan Result page
+   (.result-divider, .result-synthesis, .badge) — file ini cuma menambah
+   yang benar-benar khas Daily Card: hero layout & daftar riwayat.
+   ========================================================================== */
+
+.daily-hero {
+  display: flex;
+  gap: var(--space-5);
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.daily-hero__visual {
+  flex-shrink: 0;
+  margin: 0 auto;
+}
+
+.daily-hero__content {
+  flex: 1;
+  min-width: 220px;
+}
+
+.daily-hero__date {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--otr-mist);
+  text-transform: capitalize;
+}
+
+/* ---- Riwayat kartu harian ---- */
+.daily-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.daily-history-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  justify-content: space-between;
+  text-decoration: none;
+  color: inherit;
+}
+
+.daily-history-item__meta {
+  min-width: 0;
+}
+
+.daily-history-item__date {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--otr-mist);
+}
+
+@media (max-width: 640px) {
+  .daily-hero {
+    justify-content: center;
+    text-align: center;
+  }
+
+  .daily-hero__content {
+    min-width: 0;
+  }
+}

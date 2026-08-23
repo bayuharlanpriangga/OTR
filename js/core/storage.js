@@ -67,6 +67,10 @@ export const STORAGE_KEYS = {
   JOURNAL: "otr_guest_journal",
   SETTINGS: "otr_settings",
   FAVORITES: "otr_favorites",
+  // Phase 15 — Daily Card (ditambahkan belakangan, bukan bagian dari "4
+  // storage key" Phase 8 di atas — lihat catatan lengkap di bawah, dekat
+  // fungsi-fungsi Daily Card).
+  DAILY: "otr_guest_daily",
 };
 
 const DEFAULT_SETTINGS = {
@@ -183,4 +187,51 @@ export function listFavorites() {
 
 export function saveFavorites(list) {
   return writeJSON(STORAGE_KEYS.FAVORITES, list);
+}
+
+// ==========================================================================
+// Phase 15 — Daily Card (Roadmap Phase 15, Master Spec §27/§28)
+// Guest storage kartu harian, sengaja TERPISAH dari STORAGE_KEYS.READINGS
+// (§28: "History should store daily card readings separately from normal
+// readings"). Upsert by `date` (bukan array append-only seperti readings) —
+// paling banyak 1 baris per tanggal per definisi fitur ("satu Daily Card
+// per hari").
+// ==========================================================================
+
+export function listGuestDailyCards() {
+  return readJSON(STORAGE_KEYS.DAILY, []) ?? [];
+}
+
+export function getGuestDailyCardByDate(date) {
+  return listGuestDailyCards().find((d) => d.date === date) ?? null;
+}
+
+/** Upsert berdasarkan `record.date`. */
+export function saveGuestDailyCard(record) {
+  const all = listGuestDailyCards();
+  const idx = all.findIndex((d) => d.date === record.date);
+  if (idx >= 0) all[idx] = record;
+  else all.unshift(record);
+  return writeJSON(STORAGE_KEYS.DAILY, all);
+}
+
+// ---- Guest device id (bukan salah satu dari "4 storage key" Phase 8) ----
+// otr_guest_id adalah id acak yang dibuat SEKALI per device/browser, dipakai
+// SEMATA-MATA sebagai `seedId` deterministik di js/tarot/daily-card.js
+// (bagian "userId" dari algoritma Master Spec §27) — supaya guest juga
+// dapat kartu harian yang personal per device (bukan satu kartu global yang
+// sama untuk semua tamu di seluruh dunia), tanpa perlu bikin akun. Ini
+// BUKAN identitas user sungguhan, tidak pernah dikirim ke Supabase, dan
+// tidak ikut Guest Migration (Phase 13) — konsisten dengan keputusan
+// migration-service.js yang juga sengaja tidak menyentuh otr_settings/
+// otr_favorites saat migrasi.
+const GUEST_ID_KEY = "otr_guest_id";
+
+export function getOrCreateGuestId() {
+  let id = readJSON(GUEST_ID_KEY, null);
+  if (!id) {
+    id = uid("guest");
+    writeJSON(GUEST_ID_KEY, id);
+  }
+  return id;
 }
