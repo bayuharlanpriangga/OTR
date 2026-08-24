@@ -165,7 +165,7 @@ function readingItemHTML(reading) {
       <div class="row gap-2" style="flex-shrink:0;">
         <button
           type="button"
-          class="btn btn--ghost history-favorite-btn${isFav ? " is-favorite" : ""}"
+          class="btn btn--ghost favorite-btn${isFav ? " is-favorite" : ""}"
           data-favorite-reading="${escapeHTML(reading.id)}"
           aria-label="${isFav ? "Hapus dari favorit" : "Tandai favorit"}"
           aria-pressed="${isFav}"

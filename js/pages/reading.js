@@ -1,4 +1,5 @@
-// OTR — Page: Reading (Phase 5 — Reading MVP)
+// OTR — Page: Reading (Phase 5 — Reading MVP; toggle favorit spread
+// ditambahkan Phase 16 — Favorites, Roadmap Phase 16 / Master Spec §33)
 // Menyambungkan js/tarot/tarot-engine.js (Phase 3) + js/components/tarot-card.js
 // (Phase 4) jadi flow reading nyata: Pilih Jenis → Pilih Spread → Pertanyaan →
 // Kocok → (Tarik → Reveal → Interpretasi) berulang per kartu → Result.
@@ -19,9 +20,11 @@ import { interpretCard, synthesizeReading } from "../tarot/interpretation.js";
 import { renderTarotCard } from "../components/tarot-card.js";
 import { openModal } from "../components/modal.js";
 import { showToast } from "../components/toast.js";
+import { icon } from "../components/icons.js";
 import { patchState } from "../core/state.js";
 import { navigate } from "../router.js";
 import { prefersReducedMotion } from "../core/utils.js";
+import { listFavoriteEntityIds, toggleFavorite } from "../services/favorite-service.js";
 
 const CATEGORY_LABELS = {
   general: "Umum",
@@ -60,7 +63,7 @@ function keywordChips(keywords = []) {
  * @param {HTMLElement} container
  */
 function startFlow(container) {
-  /** @type {{engine: import("../tarot/tarot-engine.js").TarotEngine, type: "one"|"three"|null, spread: object|null, question: string, intention: string, category: string|null, cardHandle: object|null, shuffleTimer: number|null}} */
+  /** @type {{engine: import("../tarot/tarot-engine.js").TarotEngine, type: "one"|"three"|null, spread: object|null, question: string, intention: string, category: string|null, cardHandle: object|null, shuffleTimer: number|null, spreadFavoriteIds: Set<string>|null, spreadFavoriteFilter: "all"|"favorites"}} */
   const flow = {
     engine: createTarotEngine(),
     type: null,
@@ -70,6 +73,11 @@ function startFlow(container) {
     category: null,
     cardHandle: null,
     shuffleTimer: null,
+    // Cache di flow (bukan di-refetch tiap kali balik dari step lain) --
+    // Set berisi id spread yang difavoritkan, di-load sekali saat pertama
+    // masuk Step 2 (lihat showSpreadStep()). null = belum pernah di-load.
+    spreadFavoriteIds: null,
+    spreadFavoriteFilter: "all",
   };
 
   showTypeStep(container, flow);
@@ -164,9 +172,55 @@ function showTypeStep(container, flow) {
 // Step 2 — Pilih Spread
 // ---------------------------------------------------------------------------
 
-function showSpreadStep(container, flow) {
+function spreadCardHTML(s, isFav) {
+  return `
+    <div class="card card--interactive stack gap-2 spread-select-item" data-spread-select="${s.id}" role="button" tabindex="0" style="text-align:left; position:relative;">
+      <div class="row gap-3" style="justify-content:space-between; align-items:baseline;">
+        <h3>${escapeHTML(s.name)}</h3>
+        <div class="row gap-2" style="align-items:center;">
+          <span class="badge">${escapeHTML(CATEGORY_LABELS[defaultCategoryFor(s)])}</span>
+          <button
+            type="button"
+            class="btn btn--ghost favorite-btn${isFav ? " is-favorite" : ""}"
+            data-favorite-spread="${s.id}"
+            aria-label="${isFav ? "Hapus dari favorit" : "Tandai favorit"}"
+            aria-pressed="${isFav}"
+          >
+            ${icon("star", { size: 16 })}
+          </button>
+        </div>
+      </div>
+      <p class="text-sm text-muted">${escapeHTML(s.description)}</p>
+      <div class="row gap-2" style="flex-wrap:wrap;">
+        ${s.positions.map((p) => `<span class="badge">${escapeHTML(p.name)}</span>`).join("")}
+      </div>
+    </div>
+  `;
+}
+
+async function showSpreadStep(container, flow) {
   const cardCount = flow.type === "one" ? 1 : 3;
   const spreads = getAllSpreads().filter((s) => s.cardCount === cardCount);
+
+  // Spinner dulu -- listFavoriteEntityIds() bisa network call kalau login
+  // (pola sama dengan library.js/card-detail.js). Di-cache di flow supaya
+  // tidak refetch tiap kali Ganti Jenis -> balik lagi ke step ini.
+  if (!flow.spreadFavoriteIds) {
+    container.innerHTML = `<div class="row" style="justify-content:center; padding:var(--space-8) 0;"><span class="spinner" aria-label="Memuat"></span></div>`;
+    try {
+      flow.spreadFavoriteIds = await listFavoriteEntityIds("spread");
+    } catch (err) {
+      console.error("[reading] gagal memuat status favorit spread", err);
+      showToast("Gagal memuat status favorit.", "danger");
+      flow.spreadFavoriteIds = new Set();
+    }
+  }
+
+  function visibleSpreads() {
+    return flow.spreadFavoriteFilter === "favorites"
+      ? spreads.filter((s) => flow.spreadFavoriteIds.has(s.id))
+      : spreads;
+  }
 
   container.innerHTML = `
     <section class="stack gap-5">
@@ -178,35 +232,80 @@ function showSpreadStep(container, flow) {
         <button type="button" class="btn btn--ghost" data-back>&larr; Ganti Jenis</button>
       </div>
 
-      <div class="stack gap-3">
-        ${spreads
-          .map(
-            (s) => `
-          <button type="button" class="card card--interactive stack gap-2" data-spread-id="${s.id}" style="text-align:left;">
-            <div class="row gap-3" style="justify-content:space-between; align-items:baseline;">
-              <h3>${escapeHTML(s.name)}</h3>
-              <span class="badge">${escapeHTML(CATEGORY_LABELS[defaultCategoryFor(s)])}</span>
-            </div>
-            <p class="text-sm text-muted">${escapeHTML(s.description)}</p>
-            <div class="row gap-2" style="flex-wrap:wrap;">
-              ${s.positions.map((p) => `<span class="badge">${escapeHTML(p.name)}</span>`).join("")}
-            </div>
-          </button>
-        `
-          )
-          .join("")}
-      </div>
+      <button
+        type="button"
+        class="btn btn--ghost favorite-btn${flow.spreadFavoriteFilter === "favorites" ? " is-favorite" : ""}"
+        data-toggle-spread-favorites
+        aria-pressed="${flow.spreadFavoriteFilter === "favorites"}"
+        style="align-self:flex-start;"
+      >
+        ${icon("star", { size: 16 })} ${flow.spreadFavoriteFilter === "favorites" ? "Menampilkan favorit" : "Tampilkan favorit saja"}
+      </button>
+
+      <div class="stack gap-3" data-spread-list></div>
     </section>
   `;
 
+  const listEl = container.querySelector("[data-spread-list]");
+
+  function renderList() {
+    const visible = visibleSpreads();
+    listEl.innerHTML = visible.length
+      ? visible.map((s) => spreadCardHTML(s, flow.spreadFavoriteIds.has(s.id))).join("")
+      : `<p class="text-sm text-muted">Belum ada spread favorit. Tandai lewat ikon bintang di kartu spread.</p>`;
+  }
+
+  renderList();
+
   container.querySelector("[data-back]")?.addEventListener("click", () => showTypeStep(container, flow));
 
-  container.querySelectorAll("[data-spread-id]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      flow.spread = spreads.find((s) => s.id === btn.dataset.spreadId) ?? null;
-      flow.category = defaultCategoryFor(flow.spread);
-      showQuestionStep(container, flow);
-    });
+  container.querySelector("[data-toggle-spread-favorites]")?.addEventListener("click", () => {
+    flow.spreadFavoriteFilter = flow.spreadFavoriteFilter === "favorites" ? "all" : "favorites";
+    showSpreadStep(container, flow);
+  });
+
+  listEl.addEventListener("click", (e) => {
+    const favBtn = e.target.closest("[data-favorite-spread]");
+    if (favBtn) {
+      e.stopPropagation();
+      const id = favBtn.dataset.favoriteSpread;
+      favBtn.disabled = true;
+      toggleFavorite("spread", id)
+        .then((isFav) => {
+          if (isFav) flow.spreadFavoriteIds.add(id);
+          else flow.spreadFavoriteIds.delete(id);
+          favBtn.classList.toggle("is-favorite", isFav);
+          favBtn.setAttribute("aria-pressed", String(isFav));
+          favBtn.setAttribute("aria-label", isFav ? "Hapus dari favorit" : "Tandai favorit");
+          if (flow.spreadFavoriteFilter === "favorites" && !isFav) renderList();
+        })
+        .catch((err) => {
+          console.error("[reading] gagal memperbarui favorit spread", err);
+          showToast("Gagal memperbarui favorit.", "danger");
+        })
+        .finally(() => {
+          favBtn.disabled = false;
+        });
+      return;
+    }
+
+    const spreadEl = e.target.closest("[data-spread-select]");
+    if (!spreadEl) return;
+    const id = spreadEl.dataset.spreadSelect;
+    flow.spread = spreads.find((s) => s.id === id) ?? null;
+    flow.category = defaultCategoryFor(flow.spread);
+    showQuestionStep(container, flow);
+  });
+
+  listEl.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const spreadEl = e.target.closest("[data-spread-select]");
+    if (!spreadEl || e.target.closest("[data-favorite-spread]")) return;
+    e.preventDefault();
+    const id = spreadEl.dataset.spreadSelect;
+    flow.spread = spreads.find((s) => s.id === id) ?? null;
+    flow.category = defaultCategoryFor(flow.spread);
+    showQuestionStep(container, flow);
   });
 
   focusHeading(container);

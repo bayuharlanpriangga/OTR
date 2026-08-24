@@ -179,7 +179,12 @@ export function saveSettings(partial) {
   return merged;
 }
 
-// ---- Favorites (entity-based: reading/card/spread) — skeleton, UI di Phase 16 ----
+// ---- Favorites (entity-based: card/spread — Phase 16, Master Spec §33/§44) ----
+// Favorite Reading TIDAK lewat sini — itu pakai setGuestReadingFavorite() di
+// atas (kolom isFavorite langsung di reading record, sejak Phase 8), sesuai
+// skema cloud Master Spec §41 yang taruh is_favorite langsung di readings,
+// bukan lewat entity generik. Fungsi di bawah ini menangani entity yang
+// TIDAK punya kolom sendiri: "card" & "spread".
 
 export function listFavorites() {
   return readJSON(STORAGE_KEYS.FAVORITES, []) ?? [];
@@ -187,6 +192,30 @@ export function listFavorites() {
 
 export function saveFavorites(list) {
   return writeJSON(STORAGE_KEYS.FAVORITES, list);
+}
+
+/** entityId dari semua favorit untuk satu entityType ("card" | "spread"). */
+export function listGuestFavoriteIds(entityType) {
+  return listFavorites()
+    .filter((f) => f.entityType === entityType)
+    .map((f) => f.entityId);
+}
+
+/** Toggle status favorit satu entity (guest). Mengembalikan status BARU
+ *  (true = baru ditandai favorit, false = baru dihapus dari favorit). */
+export function toggleGuestFavorite(entityType, entityId) {
+  const all = listFavorites();
+  const idx = all.findIndex((f) => f.entityType === entityType && f.entityId === entityId);
+
+  if (idx >= 0) {
+    all.splice(idx, 1);
+    writeJSON(STORAGE_KEYS.FAVORITES, all);
+    return false;
+  }
+
+  all.unshift({ id: uid("favorite"), entityType, entityId, createdAt: new Date().toISOString() });
+  writeJSON(STORAGE_KEYS.FAVORITES, all);
+  return true;
 }
 
 // ==========================================================================

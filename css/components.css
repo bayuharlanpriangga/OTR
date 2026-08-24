@@ -266,17 +266,20 @@
 }
 
 /* Satu ikon stroke-only (konsisten dengan ikon lain di icons.js), "diisi"
-   (fill) begitu reading ditandai favorit lewat class .is-favorite — bukan
-   dua ikon terpisah untuk state on/off. */
-.history-favorite-btn svg {
+   (fill) begitu suatu entity ditandai favorit lewat class .is-favorite —
+   bukan dua ikon terpisah untuk state on/off. Dipakai bersama untuk semua
+   tombol favorit di app (Reading di History — Phase 10, Card di Library/
+   Card Detail & Spread di Reading setup — Phase 16), bukan satu class per
+   halaman, supaya perilaku visualnya konsisten di seluruh app. */
+.favorite-btn svg {
   transition: color var(--duration-fast) var(--ease-standard),
               fill var(--duration-fast) var(--ease-standard);
 }
 
-.history-favorite-btn.is-favorite {
+.favorite-btn.is-favorite {
   color: var(--otr-gold);
 }
 
-.history-favorite-btn.is-favorite svg {
+.favorite-btn.is-favorite svg {
   fill: var(--otr-gold);
 }
