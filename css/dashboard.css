@@ -1,5 +1,92 @@
 /* ==========================================================================
-   OTR — Dashboard styles
-   Placeholder — akan diisi di phase yang relevan.
-   Untuk saat ini, responsive rules app-shell ada di layout.css.
+   OTR — Dashboard styles (Phase 17 — Statistics)
+   Struktur DOM di-generate dari js/pages/statistics.js. Nama file tetap
+   "dashboard.css" (placeholder sejak Phase 1) alih-alih "statistics.css"
+   baru -- ini satu-satunya halaman bergaya "angka & bar" di app, jadi slot
+   yang sudah disiapkan Master Spec §0 file tree ini dipakai apa adanya.
    ========================================================================== */
+
+/* ---- Metric grid (Total Readings, Cards Drawn, dst) ---- */
+.stat-card {
+  text-align: center;
+  align-items: center;
+}
+
+.stat-card__value {
+  font-size: var(--fs-2xl);
+  color: var(--otr-gold);
+  line-height: var(--lh-tight);
+}
+
+.stat-card__label {
+  letter-spacing: 0.02em;
+}
+
+/* ---- Highlight card (Most Drawn Card / Favorite Spread / Most Frequent Suit) ---- */
+.stat-highlight {
+  align-items: flex-start;
+}
+
+.stat-highlight__icon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: var(--otr-plum);
+  color: var(--otr-gold);
+}
+
+.stat-highlight__name {
+  font-size: var(--fs-md);
+  overflow-wrap: anywhere;
+}
+
+/* ---- Bar chart rows (Orientasi Kartu, Frekuensi Suit, Top Cards) ---- */
+.stat-bar-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.stat-bar-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.stat-bar-row__label {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--fs-sm);
+}
+
+.stat-bar-track {
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--otr-plum);
+  overflow: hidden;
+}
+
+.stat-bar-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: linear-gradient(90deg, var(--otr-gold-dim), var(--otr-gold));
+  transition: width var(--duration-slow) var(--ease-out-soft);
+}
+
+/* Reversed pakai oxblood (bahasa warna "perhatian" app ini, sama dengan
+   .badge--reversed di components.css) supaya konsisten -- upright/reversed
+   sengaja beda warna, bukan cuma beda label, supaya gampang dipindai. */
+.stat-bar-fill--reversed {
+  background: linear-gradient(90deg, var(--otr-oxblood), var(--otr-oxblood-bright));
+}
+
+@media (max-width: 640px) {
+  .stat-highlight__name {
+    font-size: var(--fs-base);
+  }
+}
