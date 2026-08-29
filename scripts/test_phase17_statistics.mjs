@@ -106,9 +106,6 @@ section("3. Reading non-completed dikecualikan");
 
 section("4. Upright/Reversed % (termasuk kasus pembulatan ganjil)");
 {
-  // 1 dari 3 kartu upright -> 33.33% upright, harus tetap komplemen ke 100%
-  // (bukan 33% + 67% independen yang KEBETULAN pas juga, tapi dites eksplisit
-  // biar aman kalau logic-nya berubah nanti).
   const readings = [
     reading({
       id: "r1",
@@ -137,7 +134,6 @@ section("5. Most Drawn Card & tie-break");
   assert(stats.mostDrawnCard?.count === 2, `count harus 2, dapat ${stats.mostDrawnCard?.count}`);
   assert(stats.mostDrawnCard?.name === "The Fool", `nama harus resolve dari data kartu, dapat "${stats.mostDrawnCard?.name}"`);
 
-  // Tie 1x vs 1x -> yang PALING DULU muncul di urutan reading yang menang
   const tieReadings = [
     reading({ id: "r1", spreadId: "quick_insight", cards: [card("major_05")] }),
     reading({ id: "r2", spreadId: "quick_insight", cards: [card("major_06")] }),
@@ -193,7 +189,6 @@ section("7. Favorite Spread");
 
 section("8. Reading Streak");
 {
-  // Reading hari ini, kemarin, 2 hari lalu -> streak 3
   const consecutive = [
     reading({ id: "r1", spreadId: "quick_insight", cards: [card("major_00")], daysAgo: 0 }),
     reading({ id: "r2", spreadId: "quick_insight", cards: [card("major_00")], daysAgo: 1 }),
@@ -201,19 +196,15 @@ section("8. Reading Streak");
   ];
   assert(computeStatistics(consecutive).readingStreak === 3, `streak berturut-turut 3 hari harus 3, dapat ${computeStatistics(consecutive).readingStreak}`);
 
-  // Belum reading hari ini, tapi kemarin & 2 hari lalu ada -> tetap dianggap
-  // hidup (streak 2), TIDAK 0.
   const notYetToday = [
     reading({ id: "r1", spreadId: "quick_insight", cards: [card("major_00")], daysAgo: 1 }),
     reading({ id: "r2", spreadId: "quick_insight", cards: [card("major_00")], daysAgo: 2 }),
   ];
   assert(computeStatistics(notYetToday).readingStreak === 2, `streak "belum reading hari ini tapi kemarin ada" harus tetap 2, dapat ${computeStatistics(notYetToday).readingStreak}`);
 
-  // Ada jeda (hari ini kosong, kemarin kosong, 2 hari lalu ada) -> putus, 0
   const broken = [reading({ id: "r1", spreadId: "quick_insight", cards: [card("major_00")], daysAgo: 2 })];
   assert(computeStatistics(broken).readingStreak === 0, `streak dengan jeda 2 hari harus putus (0), dapat ${computeStatistics(broken).readingStreak}`);
 
-  // Reading dobel di hari yang sama tidak menghitung 2 hari
   const sameDayTwice = [
     reading({ id: "r1", spreadId: "quick_insight", cards: [card("major_00")], daysAgo: 0 }),
     reading({ id: "r2", spreadId: "quick_insight", cards: [card("major_01")], daysAgo: 0 }),

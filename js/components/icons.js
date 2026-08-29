@@ -20,6 +20,8 @@ const ICONS = {
   trash: '<path d="M5 7h14M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M7 7l1 13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l1-13"/>',
   star: '<path d="M12 3.5l2.6 5.4 5.9.6-4.4 4 1.2 5.9L12 16.4l-5.3 3-1.2-5.9-4.4-4 5.9-.6L12 3.5Z"/>',
   logout: '<path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3"/><path d="M15 16l4-4-4-4"/><path d="M19 12H9"/>',
+  // Phase 18 — Profile: tombol "Edit Profil".
+  edit: '<path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/><path d="M14.5 5.5l3 3"/>',
 };
 
 export function icon(name, { size = 18, className = "" } = {}) {

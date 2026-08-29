@@ -283,3 +283,38 @@
 .favorite-btn.is-favorite svg {
   fill: var(--otr-gold);
 }
+
+/* ---- Avatar (Phase 18 — Profile, dipakai juga kandidat halaman lain di
+   masa depan seperti komentar di Journal) ----
+   Placeholder (tanpa foto): lingkaran isi warna + inisial huruf pertama
+   nama/email, konsisten dengan pola lingkaran kosong yang sudah ada sejak
+   skeleton Phase 1 (js/pages/profile.js) — cuma ditambah inisial supaya
+   tidak kosong polos. Kalau ada avatarUrl, <img> mengisi penuh lingkaran
+   (object-fit: cover) menimpa inisial. */
+.avatar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--otr-plum);
+  border: 1px solid var(--otr-gold-dim);
+  color: var(--otr-gold);
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  overflow: hidden;
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar--sm {
+  width: 40px;
+  height: 40px;
+  font-size: var(--fs-base);
+}

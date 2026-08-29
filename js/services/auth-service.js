@@ -115,3 +115,45 @@ export async function resetPasswordForEmail(email) {
   const supabase = getSupabaseClient();
   return supabase.auth.resetPasswordForEmail(email, { redirectTo: SITE_URL });
 }
+
+/**
+ * Phase 18 — Profile (Roadmap Phase 18). Nama tampilan akun, dipakai
+ * Settings (Phase 13, section "Akun") DAN Profile (Phase 18) -- diekstrak
+ * ke sini (bukan diduplikasi di 2 halaman, beda dari daily-card.js/
+ * interpretation.js yang SENGAJA tidak saling reuse) karena logic
+ * fallback-nya identik & auth-service.js sudah "rumah" untuk apa pun yang
+ * berhubungan dengan bentuk objek `user` Supabase.
+ *
+ * Prioritas:
+ *  1. `profile.displayName` -- kolom `profiles.display_name`, nilai KANONIK
+ *     yang bisa diedit user lewat halaman Profile (`updateProfile()`,
+ *     profile-service.js). Cuma dipakai kalau pemanggil sudah fetch baris
+ *     profil dan melewatkannya eksplisit -- Settings TIDAK fetch profil
+ *     sama sekali (halaman itu cuma butuh label cepat tanpa network call
+ *     tambahan), jadi argumen ini selalu `undefined` di sana dan langsung
+ *     lompat ke fallback di bawah.
+ *  2. `user.user_metadata.display_name` -- diisi eksplisit oleh register.js
+ *     (form Email/Password sendiri, field "Nama Tampilan"). Trigger
+ *     `handle_new_user()` (Phase 12) menyalin nilai yang SAMA ke
+ *     `profiles.display_name` saat akun dibuat -- jadi untuk akun baru,
+ *     prioritas 1 & 2 biasanya identik; keduanya baru bisa BEDA setelah
+ *     user mengedit nama lewat halaman Profile.
+ *  3. `user_metadata.full_name` / `.name` -- diisi OTOMATIS oleh Supabase
+ *     dari profil Google saat sign-in via `signInWithGoogle()`. Google
+ *     TIDAK PERNAH mengisi `display_name`.
+ *  4. Bagian sebelum "@" di email -- fallback terakhir kalau user_metadata
+ *     kosong sama sekali.
+ *  5. `"Akun"` -- fallback paling akhir kalau bahkan email tidak ada.
+ * @param {object} user objek auth user (`state.user`)
+ * @param {{displayName?: string|null}} [profile] baris `profiles`, opsional
+ * @returns {string}
+ */
+export function resolveDisplayName(user, profile) {
+  if (profile?.displayName) return profile.displayName;
+  const meta = user?.user_metadata || {};
+  if (meta.display_name) return meta.display_name;
+  if (meta.full_name) return meta.full_name;
+  if (meta.name) return meta.name;
+  if (user?.email) return user.email.split("@")[0];
+  return "Akun";
+}

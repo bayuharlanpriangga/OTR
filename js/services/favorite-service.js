@@ -76,6 +76,33 @@ async function toggleCloud(entityType, entityId, userId) {
   return true;
 }
 
+// ---- Local (guest) — favorit TERBARU -------------------------------------
+
+async function latestIdLocal(entityType) {
+  // listGuestFavoriteIds() (di atas) sudah newest-first -- listFavorites()
+  // di core/storage.js di-unshift() tiap kali favorit baru ditambahkan
+  // (lihat toggleGuestFavorite()), jadi elemen pertama SELALU yang paling
+  // baru ditandai, tidak perlu sort tambahan di sini.
+  const ids = listGuestFavoriteIds(entityType);
+  return ids[0] ?? null;
+}
+
+// ---- Cloud — favorit TERBARU ----------------------------------------------
+
+async function latestIdCloud(entityType, userId) {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from("favorites")
+    .select("entity_id")
+    .eq("user_id", userId)
+    .eq("entity_type", entityType)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(`Gagal memuat favorit terbaru: ${error.message}`);
+  return data?.entity_id ?? null;
+}
+
 // ---- Public API -----------------------------------------------------------
 
 /** Set berisi entity_id yang sudah difavoritkan untuk satu entityType.
@@ -100,4 +127,20 @@ export async function listFavoriteEntityIds(entityType) {
 export async function toggleFavorite(entityType, entityId) {
   const userId = currentUserId();
   return userId ? toggleCloud(entityType, entityId, userId) : toggleLocal(entityType, entityId);
+}
+
+/**
+ * entity_id favorit yang PALING BARU ditandai untuk satu entityType, atau
+ * `null` kalau belum ada satu pun. Ditambahkan Phase 18 (Profile) untuk
+ * field "Favorite Card" (Master Spec §35) -- BEDA dari "Most Drawn Card" di
+ * statistics-service.js (Phase 17, kartu paling SERING ditarik di reading):
+ * ini kartu yang secara eksplisit ditandai favorit user lewat bintang di
+ * Card Detail (Phase 16), bisa jadi kartu yang belum pernah/jarang ditarik
+ * sama sekali.
+ * @param {"card"|"spread"} entityType
+ * @returns {Promise<string|null>}
+ */
+export async function getLatestFavoriteEntityId(entityType) {
+  const userId = currentUserId();
+  return userId ? latestIdCloud(entityType, userId) : latestIdLocal(entityType);
 }
