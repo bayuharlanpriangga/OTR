@@ -23,6 +23,8 @@ function registerRoutes() {
   registerRoute("/statistics", () => import("./pages/statistics.js"));
   registerRoute("/settings", () => import("./pages/settings.js"));
   registerRoute("/profile", () => import("./pages/profile.js"));
+  // Phase 19 — Custom Spread (Roadmap Phase 19, Master Spec §69)
+  registerRoute("/custom-spreads", () => import("./pages/custom-spreads.js"));
   // Phase 13 — Authentication (Master Spec §4 "Authentication routes")
   registerRoute("/login", () => import("./pages/login.js"));
   registerRoute("/register", () => import("./pages/register.js"));

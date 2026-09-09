@@ -71,6 +71,13 @@ export const STORAGE_KEYS = {
   // storage key" Phase 8 di atas — lihat catatan lengkap di bawah, dekat
   // fungsi-fungsi Daily Card).
   DAILY: "otr_guest_daily",
+  // Phase 19 — Custom Spread. Sama pola dual-backend dengan reading/journal/
+  // daily/favorites di atas (guest = localStorage, login = Supabase) --
+  // BUKAN cloud-only seperti Profile (Phase 18), karena tidak ada alasan
+  // struktural custom spread guest tidak bisa dibuat/dipakai lokal (beda
+  // dari avatar/nama yang memang nempel ke baris akun yang tidak ada untuk
+  // guest).
+  CUSTOM_SPREADS: "otr_guest_custom_spreads",
 };
 
 const DEFAULT_SETTINGS = {
@@ -242,6 +249,38 @@ export function saveGuestDailyCard(record) {
   if (idx >= 0) all[idx] = record;
   else all.unshift(record);
   return writeJSON(STORAGE_KEYS.DAILY, all);
+}
+
+// ==========================================================================
+// Phase 19 — Custom Spread (Roadmap Phase 19). Pola SAMA persis dengan
+// Guest Readings di atas (list/get/save-upsert/delete, newest-first) --
+// custom-spread-service.js yang memilih pakai fungsi-fungsi ini atau
+// jalur cloud (Supabase), sama seperti reading-service.js memilih di
+// antara listGuestReadings()/Supabase.
+// ==========================================================================
+
+export function listGuestCustomSpreads() {
+  return readJSON(STORAGE_KEYS.CUSTOM_SPREADS, []) ?? [];
+}
+
+export function getGuestCustomSpreadById(id) {
+  return listGuestCustomSpreads().find((s) => s.id === id) ?? null;
+}
+
+/** Upsert berdasarkan `spread.id`. */
+export function saveGuestCustomSpread(spread) {
+  const all = listGuestCustomSpreads();
+  const idx = all.findIndex((s) => s.id === spread.id);
+  if (idx >= 0) all[idx] = spread;
+  else all.unshift(spread);
+  return writeJSON(STORAGE_KEYS.CUSTOM_SPREADS, all);
+}
+
+export function deleteGuestCustomSpread(id) {
+  const all = listGuestCustomSpreads();
+  const next = all.filter((s) => s.id !== id);
+  if (next.length === all.length) return false;
+  return writeJSON(STORAGE_KEYS.CUSTOM_SPREADS, next);
 }
 
 // ---- Guest device id (bukan salah satu dari "4 storage key" Phase 8) ----

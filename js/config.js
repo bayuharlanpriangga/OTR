@@ -32,6 +32,8 @@ export const ROUTES = [
   { path: "/statistics", title: "Statistics" },
   { path: "/settings", title: "Settings" },
   { path: "/profile", title: "Profile" },
+  // Phase 19 — Custom Spread
+  { path: "/custom-spreads", title: "Custom Spread" },
 ];
 
 // Route yang tampil di sidebar / bottom nav (subset dari ROUTES, punya ikon)
@@ -49,4 +51,8 @@ export const NAV_ITEMS_SECONDARY = [
   { path: "/statistics", label: "Statistics", icon: "chart" },
   { path: "/settings", label: "Settings", icon: "gear" },
   { path: "/profile", label: "Profile", icon: "user" },
+  // Phase 19 — Custom Spread: sidebar saja (bottom nav dibatasi 5 utama,
+  // sama seperti History/Statistics/Settings/Profile di atas). Bisa juga
+  // diakses lewat CTA "+ Buat Spread Baru" di Reading Step 2 tipe "Custom".
+  { path: "/custom-spreads", label: "Custom Spread", icon: "layout" },
 ];

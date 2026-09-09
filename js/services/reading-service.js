@@ -31,7 +31,7 @@
 
 import { getState } from "../core/state.js";
 import { getSupabaseClient } from "../integrations/supabase.js";
-import { getSpreadById, getPositionById } from "../tarot/spreads.js";
+import { getSpreadById, getPositionById, ensureCustomSpreadsLoaded } from "../tarot/spreads.js";
 import { getCardById } from "../../data/tarot-cards.js";
 import {
   listGuestReadings,
@@ -237,18 +237,35 @@ async function setFavoriteCloud(id, isFavorite, userId) {
 }
 
 // ---- Public API -----------------------------------------------------------
+//
+// Phase 19 — Custom Spread: keempat fungsi publik di bawah (kecuali
+// delete/setFavorite yang tidak pernah menyentuh getSpreadById()) di-await
+// ensureCustomSpreadsLoaded() dulu SEBELUM memanggil listCloud/getCloudById/
+// saveCloud/listLocal -- fungsi-fungsi itu memanggil getSpreadById() secara
+// SINKRON di dalamnya (mapCloudReadingRow, saveCloud) untuk resolve nama &
+// posisi spread; kalau reading yang dibaca/disimpan memakai CUSTOM spread
+// dan registry belum dimuat, getSpreadById() akan balik undefined --
+// mapCloudReadingRow sendiri sudah null-safe (spreadName jatuh ke
+// row.spread_id mentah), tapi saveCloud() akan menolak simpan reading baru
+// sama sekali kalau spread-nya tidak dikenali. Satu await tambahan ini
+// (memoized, lihat komentar ensureCustomSpreadsLoaded() di spreads.js)
+// membuat SEMUA pemanggil fungsi-fungsi ini otomatis benar tanpa perlu
+// mengingat memanggilnya sendiri-sendiri di tiap halaman.
 
 export async function listReadings() {
+  await ensureCustomSpreadsLoaded();
   const userId = currentUserId();
   return userId ? listCloud(userId) : listLocal();
 }
 
 export async function getReadingById(id) {
+  await ensureCustomSpreadsLoaded();
   const userId = currentUserId();
   return userId ? getCloudById(id, userId) : getLocalById(id);
 }
 
 export async function saveReading(record) {
+  await ensureCustomSpreadsLoaded();
   const userId = currentUserId();
   return userId ? saveCloud(record, userId) : saveLocal(record);
 }

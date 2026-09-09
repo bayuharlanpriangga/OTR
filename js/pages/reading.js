@@ -15,7 +15,7 @@
 // sesuai roadmap.
 
 import { createTarotEngine } from "../tarot/tarot-engine.js";
-import { getAllSpreads } from "../tarot/spreads.js";
+import { getAllSpreads, ensureCustomSpreadsLoaded, listRegisteredCustomSpreads } from "../tarot/spreads.js";
 import { interpretCard, synthesizeReading } from "../tarot/interpretation.js";
 import { renderTarotCard } from "../components/tarot-card.js";
 import { openModal } from "../components/modal.js";
@@ -63,7 +63,7 @@ function keywordChips(keywords = []) {
  * @param {HTMLElement} container
  */
 function startFlow(container) {
-  /** @type {{engine: import("../tarot/tarot-engine.js").TarotEngine, type: "one"|"three"|null, spread: object|null, question: string, intention: string, category: string|null, cardHandle: object|null, shuffleTimer: number|null, spreadFavoriteIds: Set<string>|null, spreadFavoriteFilter: "all"|"favorites"}} */
+  /** @type {{engine: import("../tarot/tarot-engine.js").TarotEngine, type: "one"|"three"|"custom"|null, spread: object|null, question: string, intention: string, category: string|null, cardHandle: object|null, shuffleTimer: number|null, spreadFavoriteIds: Set<string>|null, spreadFavoriteFilter: "all"|"favorites", customSpreads: object[]|null}} */
   const flow = {
     engine: createTarotEngine(),
     type: null,
@@ -78,6 +78,10 @@ function startFlow(container) {
     // masuk Step 2 (lihat showSpreadStep()). null = belum pernah di-load.
     spreadFavoriteIds: null,
     spreadFavoriteFilter: "all",
+    // Phase 19 — Custom Spread: cache daftar custom spread milik user,
+    // di-load sekali saat pertama masuk Step 2 tipe "custom" (lihat
+    // showCustomSpreadStep()). null = belum pernah di-load.
+    customSpreads: null,
   };
 
   showTypeStep(container, flow);
@@ -154,6 +158,11 @@ function showTypeStep(container, flow) {
           <p class="text-sm text-muted">Masa lalu, sekarang, masa depan — atau sudut pandang lain.</p>
           <span class="badge">${threeCount} spread</span>
         </button>
+        <button type="button" class="card card--interactive stack gap-2" data-reading-type="custom" style="text-align:left;">
+          <h3>${icon("layout", { size: 16 })} Custom Spread</h3>
+          <p class="text-sm text-muted">Spread buatanmu sendiri, jumlah posisi bebas.</p>
+          <span class="badge">Punyamu</span>
+        </button>
       </div>
     </section>
   `;
@@ -199,6 +208,12 @@ function spreadCardHTML(s, isFav) {
 }
 
 async function showSpreadStep(container, flow) {
+  // Phase 19 — Custom Spread: tipe "custom" punya sumber data & UI yang
+  // beda total (tidak difilter cardCount, ada tombol "+ Buat Spread Baru"),
+  // jadi didelegasikan ke fungsi terpisah alih-alih menambah banyak
+  // percabangan if/else di tengah fungsi ini.
+  if (flow.type === "custom") return showCustomSpreadStep(container, flow);
+
   const cardCount = flow.type === "one" ? 1 : 3;
   const spreads = getAllSpreads().filter((s) => s.cardCount === cardCount);
 
@@ -301,6 +316,110 @@ async function showSpreadStep(container, flow) {
     if (e.key !== "Enter" && e.key !== " ") return;
     const spreadEl = e.target.closest("[data-spread-select]");
     if (!spreadEl || e.target.closest("[data-favorite-spread]")) return;
+    e.preventDefault();
+    const id = spreadEl.dataset.spreadSelect;
+    flow.spread = spreads.find((s) => s.id === id) ?? null;
+    flow.category = defaultCategoryFor(flow.spread);
+    showQuestionStep(container, flow);
+  });
+
+  focusHeading(container);
+}
+
+// ---------------------------------------------------------------------------
+// Step 2b — Pilih Custom Spread (Phase 19 — Custom Spread)
+// ---------------------------------------------------------------------------
+
+function customSpreadCardHTML(s) {
+  return `
+    <div class="card card--interactive stack gap-2 spread-select-item" data-spread-select="${s.id}" role="button" tabindex="0" style="text-align:left;">
+      <div class="row gap-3" style="justify-content:space-between; align-items:baseline;">
+        <h3>${escapeHTML(s.name)}</h3>
+        <span class="badge">${s.cardCount} kartu</span>
+      </div>
+      ${s.description ? `<p class="text-sm text-muted">${escapeHTML(s.description)}</p>` : ""}
+      <div class="row gap-2" style="flex-wrap:wrap;">
+        ${s.positions.map((p) => `<span class="badge">${escapeHTML(p.name)}</span>`).join("")}
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Tipe "Custom Spread" (Step 1) -- BEDA dari One/Three Card di atas:
+ * tidak difilter cardCount (custom spread bisa berapa pun posisinya, lihat
+ * contoh Roadmap Phase 19 "My Decision Spread" — 5 posisi), sumbernya
+ * ensureCustomSpreadsLoaded() + listRegisteredCustomSpreads() dari
+ * js/tarot/spreads.js -- SENGAJA BUKAN listCustomSpreads() langsung dari
+ * custom-spread-service.js, supaya spread yang dipilih di sini adalah
+ * OBJEK YANG SAMA PERSIS dengan yang ada di registry spreads.js. Kalau
+ * pakai listCustomSpreads() langsung, flow.spread akan berisi objek hasil
+ * fetch terpisah yang TIDAK terdaftar di registry, dan
+ * flow.engine.createReading() beberapa langkah lagi akan gagal (throw
+ * "Spread tidak ditemukan") karena resolveSpread()/getSpreadById() di
+ * dalamnya cuma mengecek registry itu, bukan hasil fetch lokal fungsi ini.
+ *
+ * Ada CTA "+ Buat Spread Baru" mengarah ke js/pages/custom-spreads.js
+ * (halaman manajemen terpisah, bukan bagian flow Reading ini -- membuat
+ * spread baru di tengah-tengah flow reading akan memutus konteks
+ * "Pertanyaan & Niat" yang sudah mulai diisi kalau user bolak-balik; lebih
+ * sederhana arahkan ke halaman lain lalu user mengulang dari Step 1
+ * setelah spread baru jadi).
+ */
+async function showCustomSpreadStep(container, flow) {
+  if (!flow.customSpreads) {
+    container.innerHTML = `<div class="row" style="justify-content:center; padding:var(--space-8) 0;"><span class="spinner" aria-label="Memuat"></span></div>`;
+    try {
+      await ensureCustomSpreadsLoaded();
+      flow.customSpreads = listRegisteredCustomSpreads();
+    } catch (err) {
+      console.error("[reading] gagal memuat custom spread", err);
+      showToast("Gagal memuat custom spread.", "danger");
+      flow.customSpreads = [];
+    }
+  }
+
+  const spreads = flow.customSpreads;
+
+  container.innerHTML = `
+    <section class="stack gap-5">
+      <div class="row gap-3" style="justify-content:space-between; align-items:flex-start;">
+        <div>
+          <p class="eyebrow">Reading · Custom Spread</p>
+          <h1 class="font-display">Pilih Spread</h1>
+        </div>
+        <button type="button" class="btn btn--ghost" data-back>&larr; Ganti Jenis</button>
+      </div>
+
+      <a class="btn btn--secondary" href="#/custom-spreads" style="align-self:flex-start;">
+        ${icon("plus", { size: 16 })} Buat Spread Baru
+      </a>
+
+      <div class="stack gap-3" data-spread-list>
+        ${
+          spreads.length
+            ? spreads.map(customSpreadCardHTML).join("")
+            : `<p class="text-sm text-muted">Belum ada custom spread. Buat dulu lewat tombol di atas.</p>`
+        }
+      </div>
+    </section>
+  `;
+
+  container.querySelector("[data-back]")?.addEventListener("click", () => showTypeStep(container, flow));
+
+  const listEl = container.querySelector("[data-spread-list]");
+  listEl.addEventListener("click", (e) => {
+    const spreadEl = e.target.closest("[data-spread-select]");
+    if (!spreadEl) return;
+    const id = spreadEl.dataset.spreadSelect;
+    flow.spread = spreads.find((s) => s.id === id) ?? null;
+    flow.category = defaultCategoryFor(flow.spread);
+    showQuestionStep(container, flow);
+  });
+  listEl.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const spreadEl = e.target.closest("[data-spread-select]");
+    if (!spreadEl) return;
     e.preventDefault();
     const id = spreadEl.dataset.spreadSelect;
     flow.spread = spreads.find((s) => s.id === id) ?? null;

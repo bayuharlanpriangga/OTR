@@ -13,17 +13,81 @@
 // dipulihkan lintas tab.
 
 import { getSupabaseClient } from "../integrations/supabase.js";
-import { listGuestReadings, listGuestJournalEntries, STORAGE_KEYS, remove } from "../core/storage.js";
-import { getSpreadById, getPositionById } from "../tarot/spreads.js";
+import {
+  listGuestReadings,
+  listGuestJournalEntries,
+  listGuestCustomSpreads,
+  STORAGE_KEYS,
+  remove,
+} from "../core/storage.js";
+import { getSpreadById, getPositionById, registerCustomSpread } from "../tarot/spreads.js";
 
 /**
- * Migrasikan seluruh guest reading (+ journal terkait) dari localStorage ke
- * Supabase. Data lokal HANYA dihapus kalau seluruh reading berhasil
- * termigrasi -- DONE WHEN Roadmap Phase 13 eksplisit minta "tanpa kehilangan
- * data", jadi migrasi partial/gagal sengaja TIDAK menghapus apa pun secara
- * lokal (aman dicoba lagi di login berikutnya; reading yang sudah sempat
- * ter-insert ke Supabase sebelum kegagalan tetap ada di sana, cuma belum
- * "resmi" dianggap termigrasi sampai localStorage-nya ikut bersih).
+ * Salin custom spread guest (Phase 19) ke cloud SEBELUM readings dimigrasi.
+ * Readings guest yang memakai custom spread punya `spreadId` yang menunjuk
+ * ke id lokal ini; kalau baris `spreads` cloud belum ada saat readings
+ * di-insert, insert reading itu akan GAGAL kena foreign key constraint
+ * `readings.spread_id references spreads(id)` (0001_init_schema.sql §41,
+ * sengaja TANPA on delete cascade/action lain -- lihat komentar di
+ * custom-spread-service.js). ID SENGAJA DIPERTAHANKAN SAMA (bukan dibuat
+ * ulang) supaya `guestReading.spreadId` di loop bawah tetap valid tanpa
+ * perlu menulis ulang setiap reading yang mereferensikannya.
+ *
+ * registerCustomSpread() dipanggil di akhir tiap iterasi supaya
+ * getSpreadById() (dipakai loop readings di bawah) langsung bisa melihat
+ * spread yang baru saja dimigrasi TANPA perlu ensureCustomSpreadsLoaded()
+ * (yang notabene akan fetch ulang dari cloud -- state race yang tidak
+ * perlu di tengah proses migrasi satu kali ini).
+ */
+async function migrateGuestCustomSpreads(supabase, userId) {
+  const guestSpreads = listGuestCustomSpreads();
+  for (const spread of guestSpreads) {
+    const { error: spreadError } = await supabase.from("spreads").insert({
+      id: spread.id,
+      name: spread.name,
+      slug: spread.id,
+      category: spread.category || "general",
+      description: spread.description || null,
+      card_count: spread.cardCount,
+      is_system: false,
+      user_id: userId,
+      created_at: spread.createdAt || new Date().toISOString(),
+    });
+    if (spreadError) {
+      // 23505 = unique violation (Postgres) -- kemungkinan migrasi ini
+      // pernah jalan sebagian di percobaan sebelumnya (retry setelah gagal
+      // di tengah jalan, lihat catatan "aman dicoba lagi" di
+      // migrateGuestDataToCloud()) dan spread ini SUDAH sempat termigrasi.
+      // Aman dilewati -- BUKAN dianggap fatal -- supaya retry migrasi tidak
+      // macet permanen gara-gara langkah yang sebenarnya sudah sukses.
+      if (spreadError.code !== "23505") {
+        throw new Error(`Migrasi custom spread "${spread.id}" gagal: ${spreadError.message}`);
+      }
+    } else {
+      const positionRows = spread.positions.map((p) => ({
+        spread_id: spread.id,
+        position_index: p.index,
+        name: p.name,
+        description: p.description || null,
+      }));
+      const { error: positionsError } = await supabase.from("spread_positions").insert(positionRows);
+      if (positionsError) {
+        throw new Error(`Migrasi posisi custom spread "${spread.id}" gagal: ${positionsError.message}`);
+      }
+    }
+    registerCustomSpread(spread);
+  }
+}
+
+/**
+ * Migrasikan seluruh guest reading (+ journal terkait, + custom spread yang
+ * dipakainya -- Phase 19) dari localStorage ke Supabase. Data lokal HANYA
+ * dihapus kalau seluruhnya berhasil termigrasi -- DONE WHEN Roadmap Phase 13
+ * eksplisit minta "tanpa kehilangan data", jadi migrasi partial/gagal
+ * sengaja TIDAK menghapus apa pun secara lokal (aman dicoba lagi di login
+ * berikutnya; reading yang sudah sempat ter-insert ke Supabase sebelum
+ * kegagalan tetap ada di sana, cuma belum "resmi" dianggap termigrasi
+ * sampai localStorage-nya ikut bersih).
  *
  * @param {string} userId
  * @returns {Promise<{ ok:boolean, migratedReadings:number, migratedJournals:number, total:number, error?:string }>}
@@ -31,8 +95,15 @@ import { getSpreadById, getPositionById } from "../tarot/spreads.js";
 export async function migrateGuestDataToCloud(userId) {
   const guestReadings = listGuestReadings();
   const guestJournals = listGuestJournalEntries();
+  const guestCustomSpreads = listGuestCustomSpreads();
 
-  if (guestReadings.length === 0) {
+  // Phase 19: sebelumnya guard ini cuma cek guestReadings.length -- user
+  // yang sudah bikin custom spread tapi BELUM sempat reading dengannya
+  // (spread-nya "yatim", tidak direferensikan reading mana pun) akan lolos
+  // guard lama tanpa pernah termigrasi, jadi diam-diam hilang begitu
+  // currentUserId() beralih ke cloud pasca-login. Sekarang custom spread
+  // yang belum dipakai reading apa pun TETAP dimigrasi lewat cabang ini.
+  if (guestReadings.length === 0 && guestCustomSpreads.length === 0) {
     return { ok: true, migratedReadings: 0, migratedJournals: 0, total: 0 };
   }
 
@@ -61,11 +132,18 @@ export async function migrateGuestDataToCloud(userId) {
   let migratedJournals = 0;
 
   try {
+    // Custom spread (Phase 19) dimigrasi DULU, sebelum readings -- lihat
+    // komentar lengkap migrateGuestCustomSpreads() di atas. Kalau ini gagal,
+    // seluruh migrasi dianggap gagal (masuk catch di bawah) sama seperti
+    // kegagalan di loop readings.
+    await migrateGuestCustomSpreads(supabase, userId);
+
     for (const guestReading of guestReadings) {
       // Resolve spread lokal dulu -- kalau id-nya sendiri sudah tidak
-      // dikenali data/default-spreads.js, tidak ada cara aman menerka
-      // posisi kartu, jadi migrasi dihentikan (bukan di-skip diam-diam,
-      // supaya tidak ada reading yang "hilang" tanpa penjelasan).
+      // dikenali data/default-spreads.js MAUPUN custom spread yang baru
+      // saja dimigrasi di atas, tidak ada cara aman menerka posisi kartu,
+      // jadi migrasi dihentikan (bukan di-skip diam-diam, supaya tidak ada
+      // reading yang "hilang" tanpa penjelasan).
       const spread = getSpreadById(guestReading.spreadId);
       if (!spread) {
         throw new Error(
@@ -152,10 +230,13 @@ export async function migrateGuestDataToCloud(userId) {
     };
   }
 
-  // Semua reading (+ journal terkait) berhasil -> baru aman menghapus data
-  // lokal yang sudah termigrasi. Tidak menyentuh otr_settings/otr_favorites.
+  // Semua reading (+ journal + custom spread) berhasil -> baru aman
+  // menghapus data lokal yang sudah termigrasi. Tidak menyentuh
+  // otr_settings/otr_favorites (lihat keputusan yang sama di komentar file
+  // ini bagian atas & Known Issues Phase 15/16 di PROJECT_STATUS.md).
   remove(STORAGE_KEYS.READINGS);
   remove(STORAGE_KEYS.JOURNAL);
+  remove(STORAGE_KEYS.CUSTOM_SPREADS);
 
   return { ok: true, migratedReadings, migratedJournals, total: guestReadings.length };
 }
