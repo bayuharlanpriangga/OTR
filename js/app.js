@@ -21,6 +21,12 @@ function registerRoutes() {
   registerRoute("/history/:readingId", () => import("./pages/history-detail.js"));
   registerRoute("/journal", () => import("./pages/journal.js"));
   registerRoute("/statistics", () => import("./pages/statistics.js"));
+  // Phase 20 — Learn Tarot (Roadmap Phase 20, Master Spec §70). Route
+  // ":section" opsional lewat dua registerRoute terpisah (pola sama dengan
+  // /library + /library/:cardId) -- /learn polos default ke section
+  // pertama ("basics"), lihat js/pages/learn.js.
+  registerRoute("/learn", () => import("./pages/learn.js"));
+  registerRoute("/learn/:section", () => import("./pages/learn.js"));
   registerRoute("/settings", () => import("./pages/settings.js"));
   registerRoute("/profile", () => import("./pages/profile.js"));
   // Phase 19 — Custom Spread (Roadmap Phase 19, Master Spec §69)

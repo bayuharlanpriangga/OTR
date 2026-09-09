@@ -30,6 +30,8 @@ export const ROUTES = [
   { path: "/history", title: "History" },
   { path: "/journal", title: "Journal" },
   { path: "/statistics", title: "Statistics" },
+  // Phase 20 — Learn Tarot
+  { path: "/learn", title: "Learn" },
   { path: "/settings", title: "Settings" },
   { path: "/profile", title: "Profile" },
   // Phase 19 — Custom Spread
@@ -49,6 +51,9 @@ export const NAV_ITEMS = [
 export const NAV_ITEMS_SECONDARY = [
   { path: "/history", label: "History", icon: "clock" },
   { path: "/statistics", label: "Statistics", icon: "chart" },
+  // Phase 20 — Learn Tarot: sidebar saja (bottom nav dibatasi 5 utama,
+  // sama seperti History/Statistics/dst di atas).
+  { path: "/learn", label: "Learn", icon: "graduate" },
   { path: "/settings", label: "Settings", icon: "gear" },
   { path: "/profile", label: "Profile", icon: "user" },
   // Phase 19 — Custom Spread: sidebar saja (bottom nav dibatasi 5 utama,

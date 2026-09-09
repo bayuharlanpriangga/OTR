@@ -25,6 +25,8 @@ const ICONS = {
   // Phase 19 — Custom Spread: entri nav & kartu spread builder.
   layout: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
+  // Phase 20 — Learn Tarot: entri nav.
+  graduate: '<path d="M12 3 2 8l10 5 10-5-10-5Z"/><path d="M6 10.5V16c0 1.5 3 3 6 3s6-1.5 6-3v-5.5"/>',
 };
 
 export function icon(name, { size = 18, className = "" } = {}) {
