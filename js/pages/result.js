@@ -45,6 +45,9 @@ import { formatDate } from "../core/utils.js";
 // core/storage.js yang sama saat state.user null.
 import { saveReading, getReadingById } from "../services/reading-service.js";
 import { getJournalByReadingId, saveJournalEntry } from "../services/journal-service.js";
+// Phase 22 — AI Reading: opsional, di luar flow SAVE -> JOURNAL -> HISTORY
+// di atas -- lihat komentar panel AI di renderResult() untuk alasan gating-nya.
+import { buildAIReadingPayload, getAIReadingSynthesis } from "../services/ai-service.js";
 
 const CATEGORY_LABELS = {
   general: "Umum",
@@ -67,6 +70,39 @@ function keywordChips(keywords = []) {
 
 function dividerHTML() {
   return `<div class="result-divider" aria-hidden="true"></div>`;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 22 — AI Reading (Roadmap Phase 22, Master Spec §66-68)
+// ---------------------------------------------------------------------------
+
+function aiPanelIdleHTML() {
+  return `
+    <button type="button" class="btn btn--secondary" data-ai-generate>
+      ${icon("star", { size: 16 })} <span data-ai-btn-label>Lihat Interpretasi AI</span>
+    </button>
+  `;
+}
+
+function aiSynthesisHTML(synthesis) {
+  return `
+    <div class="result-synthesis__block stack gap-2">
+      <p class="eyebrow">Theme</p>
+      <p class="text-sm">${escapeHTML(synthesis.theme)}</p>
+    </div>
+    <div class="result-synthesis__block stack gap-2">
+      <p class="eyebrow">Summary</p>
+      <p class="text-sm">${escapeHTML(synthesis.summary)}</p>
+    </div>
+    <div class="result-synthesis__block stack gap-2">
+      <p class="eyebrow">Key Message</p>
+      <p class="text-sm">${escapeHTML(synthesis.keyMessage)}</p>
+    </div>
+    <div class="result-synthesis__block stack gap-2">
+      <p class="eyebrow">Reflection</p>
+      <p class="text-sm text-muted" style="font-style:italic;">${escapeHTML(synthesis.reflection)}</p>
+    </div>
+  `;
 }
 
 function renderEmpty(container) {
@@ -247,6 +283,19 @@ function renderResult(container, reading, { alreadySaved: initialAlreadySaved, e
 
       ${dividerHTML()}
 
+      <div class="result-section card result-ai result-synthesis">
+        <div class="result-synthesis__watermark weave" aria-hidden="true"></div>
+        <div class="result-synthesis__block stack gap-2">
+          <p class="eyebrow">AI Reading <span class="badge">Opsional</span></p>
+          <p class="text-sm text-muted">Sintesis tambahan dari AI berdasarkan kartu-kartu di atas — bersifat reflektif untuk direnungkan, bukan ramalan pasti.</p>
+        </div>
+        <div class="result-synthesis__block" data-ai-body>
+          ${aiPanelIdleHTML()}
+        </div>
+      </div>
+
+      ${dividerHTML()}
+
       <div class="result-section result-actions row gap-3" style="flex-wrap:wrap;">
         <button type="button" class="btn btn--primary" data-new-reading>${icon("sparkle", { size: 16 })} Reading Baru</button>
         <button type="button" class="btn btn--secondary" data-save-reading ${alreadySaved ? "disabled" : ""}>${icon("bookmark", { size: 16 })} <span data-save-label>${alreadySaved ? "Tersimpan" : "Simpan Reading"}</span></button>
@@ -322,6 +371,36 @@ function renderResult(container, reading, { alreadySaved: initialAlreadySaved, e
         journalBtn.disabled = false;
       },
     });
+  });
+
+  // Phase 22 — AI Reading: SENGAJA tidak digerbang di belakang "Simpan
+  // Reading" seperti Journal -- AI synthesis tidak menunjuk ke readingId
+  // apa pun (tidak dipersist, lihat komentar scope di js/services/ai-service.js),
+  // jadi bisa dilihat kapan saja begitu reading selesai, sama seperti
+  // Overall Theme/Key Message/Reflection lokal di atasnya.
+  const aiBody = container.querySelector("[data-ai-body]");
+  aiBody?.addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-ai-generate]");
+    if (!btn || btn.disabled) return;
+
+    btn.disabled = true;
+    const label = btn.querySelector("[data-ai-btn-label]");
+    if (label) label.textContent = "Menyusun interpretasi...";
+
+    try {
+      const payload = buildAIReadingPayload({
+        question: reading.question ?? "",
+        spread,
+        entries: validEntries,
+      });
+      const synthesis = await getAIReadingSynthesis(payload);
+      aiBody.innerHTML = aiSynthesisHTML(synthesis);
+    } catch (err) {
+      console.error("[result] gagal mendapatkan interpretasi AI", err);
+      showToast("Gagal mendapatkan interpretasi AI. Coba lagi.", "danger");
+      btn.disabled = false;
+      if (label) label.textContent = "Coba Lagi";
+    }
   });
 }
 

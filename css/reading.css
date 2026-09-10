@@ -254,6 +254,13 @@ html[data-reduced-motion="true"] .result-section {
   border-top: 1px solid var(--otr-hairline);
 }
 
+/* ---- AI Reading panel (Phase 22) — reuse .result-synthesis, border putus-putus
+   supaya sekilas beda dari Overall Theme/Key Message/Reflection lokal di
+   atasnya (sumber datanya beda: AI vs template deterministik lokal). ---- */
+.result-ai {
+  border-style: dashed;
+}
+
 /* ---- Action band ---- */
 .result-actions {
   padding-top: var(--space-2);
