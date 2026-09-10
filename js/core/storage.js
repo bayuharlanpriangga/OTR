@@ -78,6 +78,10 @@ export const STORAGE_KEYS = {
   // dari avatar/nama yang memang nempel ke baris akun yang tidak ada untuk
   // guest).
   CUSTOM_SPREADS: "otr_guest_custom_spreads",
+  // Phase 21 — Quiz Progress. Sama pola dual-backend lagi -- "Progress"
+  // adalah fitur WAJIB Roadmap Phase 21, dan tidak ada alasan itu harus
+  // cloud-only untuk guest (beda dari Profile).
+  QUIZ_PROGRESS: "otr_guest_quiz_progress",
 };
 
 const DEFAULT_SETTINGS = {
@@ -281,6 +285,30 @@ export function deleteGuestCustomSpread(id) {
   const next = all.filter((s) => s.id !== id);
   if (next.length === all.length) return false;
   return writeJSON(STORAGE_KEYS.CUSTOM_SPREADS, next);
+}
+
+// ==========================================================================
+// Phase 21 — Quiz Progress (Roadmap Phase 21, Master Spec §71)
+// Satu baris per TOPIK (bukan log semua attempt) -- "best score" + jumlah
+// attempt, upsert by `topic`. Sama pola dengan Guest Daily Card di atas
+// (upsert by key tunggal, bukan array append-only).
+// ==========================================================================
+
+export function listGuestQuizProgress() {
+  return readJSON(STORAGE_KEYS.QUIZ_PROGRESS, []) ?? [];
+}
+
+export function getGuestQuizProgressByTopic(topic) {
+  return listGuestQuizProgress().find((p) => p.topic === topic) ?? null;
+}
+
+/** Upsert berdasarkan `record.topic`. */
+export function saveGuestQuizProgress(record) {
+  const all = listGuestQuizProgress();
+  const idx = all.findIndex((p) => p.topic === record.topic);
+  if (idx >= 0) all[idx] = record;
+  else all.unshift(record);
+  return writeJSON(STORAGE_KEYS.QUIZ_PROGRESS, all);
 }
 
 // ---- Guest device id (bukan salah satu dari "4 storage key" Phase 8) ----

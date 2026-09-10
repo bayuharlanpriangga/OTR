@@ -54,6 +54,9 @@ export const NAV_ITEMS_SECONDARY = [
   // Phase 20 — Learn Tarot: sidebar saja (bottom nav dibatasi 5 utama,
   // sama seperti History/Statistics/dst di atas).
   { path: "/learn", label: "Learn", icon: "graduate" },
+  // Phase 21 — Quiz: sidebar saja, sama alasan dengan Learn di atas. Juga
+  // bisa diakses lewat CTA "Mulai Kuis" di Learn page.
+  { path: "/quiz", label: "Quiz", icon: "quiz" },
   { path: "/settings", label: "Settings", icon: "gear" },
   { path: "/profile", label: "Profile", icon: "user" },
   // Phase 19 — Custom Spread: sidebar saja (bottom nav dibatasi 5 utama,

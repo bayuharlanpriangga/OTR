@@ -27,6 +27,12 @@ function registerRoutes() {
   // pertama ("basics"), lihat js/pages/learn.js.
   registerRoute("/learn", () => import("./pages/learn.js"));
   registerRoute("/learn/:section", () => import("./pages/learn.js"));
+
+  // Phase 21 — Quiz. "/quiz" polos = pemilihan topik; "/quiz/:topic" =
+  // sesi kuis berjalan untuk topik itu.
+  registerRoute("/quiz", () => import("./pages/quiz.js"));
+  registerRoute("/quiz/:topic", () => import("./pages/quiz.js"));
+
   registerRoute("/settings", () => import("./pages/settings.js"));
   registerRoute("/profile", () => import("./pages/profile.js"));
   // Phase 19 — Custom Spread (Roadmap Phase 19, Master Spec §69)

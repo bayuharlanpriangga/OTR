@@ -27,6 +27,8 @@ const ICONS = {
   plus: '<path d="M12 5v14M5 12h14"/>',
   // Phase 20 — Learn Tarot: entri nav.
   graduate: '<path d="M12 3 2 8l10 5 10-5-10-5Z"/><path d="M6 10.5V16c0 1.5 3 3 6 3s6-1.5 6-3v-5.5"/>',
+  // Phase 21 — Quiz: entri nav & CTA di Learn.
+  quiz: '<circle cx="12" cy="12" r="9"/><path d="M9.2 9.3a2.8 2.8 0 0 1 5.4.9c0 1.8-2.6 2.1-2.6 3.8"/><path d="M12 17.3v.1"/>',
 };
 
 export function icon(name, { size = 18, className = "" } = {}) {

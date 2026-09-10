@@ -232,6 +232,22 @@ function spreadsSectionHTML() {
   `;
 }
 
+// Phase 21 — Quiz. CTA ini SENGAJA tampil di SEMUA section (dipanggil dari
+// template(), bukan jadi bagian salah satu SECTION_RENDERERS) -- "practice"
+// relevan terlepas dari section mana yang lagi dibaca, dan Roadmap Phase 21
+// sendiri menyebut Goal-nya "Interactive learning" (pelengkap Learn, bukan
+// fitur section tersendiri).
+function quizCtaHTML() {
+  return `
+    <div class="card weave stack gap-2">
+      <p class="eyebrow">Practice</p>
+      <h3>Uji pemahamanmu</h3>
+      <p class="text-sm text-muted">Coba kuis singkat dari materi yang baru saja kamu baca — Major Arcana, Suits, Numbers, Court Cards, atau campuran semuanya.</p>
+      <a class="btn btn--primary" href="#/quiz" style="align-self:flex-start;">Mulai Kuis</a>
+    </div>
+  `;
+}
+
 const SECTION_RENDERERS = {
   basics: basicsSectionHTML,
   "major-arcana": majorArcanaSectionHTML,
@@ -272,6 +288,8 @@ function template(activeSlug) {
         <h2 class="font-display" style="margin-bottom:var(--space-3);">${escapeHTML(section.label)}</h2>
         ${renderContent()}
       </div>
+
+      ${quizCtaHTML()}
     </section>
   `;
 }

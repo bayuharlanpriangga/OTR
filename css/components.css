@@ -240,6 +240,33 @@
   color: var(--otr-oxblood-bright);
 }
 
+/* ---- Quiz options (Phase 21 — Quiz) ----
+   Tidak ada css/quiz.css sendiri: sama alasan dengan History di bawah --
+   Master Spec §3 tidak mendaftar file itu, jadi styling digabung ke sini.
+   Base .btn.btn--secondary dipakai apa adanya untuk state "belum dijawab"
+   (lihat js/pages/quiz.js#optionButtonHTML) -- 2 modifier di bawah cuma
+   menimpa warna untuk state "sudah dijawab". */
+.quiz-option {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.quiz-option:disabled {
+  opacity: 1; /* .btn:disabled default (0.45) terlalu redup untuk feedback benar/salah yang harus tetap terbaca jelas */
+}
+
+.quiz-option--correct {
+  background: rgba(74, 155, 111, 0.18);
+  border-color: var(--otr-success);
+  color: var(--otr-parchment);
+}
+
+.quiz-option--incorrect {
+  background: rgba(122, 46, 58, 0.18);
+  border-color: var(--otr-oxblood);
+  color: var(--otr-parchment);
+}
+
 /* ---- History toolbar & favorite toggle (Phase 10 — Reading History) ----
    Tidak ada css/history.css sendiri: Master Spec §3 cuma daftar 12 file di
    css/ dan history.css bukan salah satunya (history.js/history-detail.js
