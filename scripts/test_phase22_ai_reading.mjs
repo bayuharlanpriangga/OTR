@@ -252,11 +252,19 @@ async function main() {
   const isLoadingOrDone = labelDuringLoad === "Menyusun interpretasi..." || labelDuringLoad === "Coba Lagi";
   assert(isLoadingOrDone, `tombol menunjukkan state loading atau sudah gagal segera setelah diklik (label: "${labelDuringLoad}")`);
 
-  // Tunggu request (yang pasti gagal di sandbox ini -- tidak ada akses ke
-  // *.supabase.co) selesai reject sepenuhnya sebelum assert final. Gagal di
-  // sandbox ini cepat (egress proxy menolak host dalam puluhan ms, bukan
-  // timeout network sungguhan), tapi diberi jeda longgar supaya tidak flaky.
-  await new Promise((resolve) => setTimeout(resolve, 500));
+  // Tunggu request selesai (gagal ATAU sukses) sebelum assert final, dengan
+  // POLLING alih-alih fixed sleep. Di sandbox tanpa akses jaringan, egress
+  // proxy menolak host dalam puluhan ms sehingga fixed 500ms cukup -- tapi
+  // di mesin dengan akses internet sungguhan ke *.supabase.co (config.js
+  // proyek ini sudah diisi URL/anon key asli, bukan placeholder), request
+  // menempuh DNS+TLS+round-trip beneran yang bisa lebih lambat dari 500ms,
+  // membuat tombol masih berstatus loading saat assert dijalankan (flaky).
+  const settleDeadline = Date.now() + 8000;
+  while (Date.now() < settleDeadline) {
+    const label = container.querySelector("[data-ai-btn-label]")?.textContent ?? "";
+    if (label !== "Menyusun interpretasi...") break;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
 
   const btnAfter = container.querySelector("[data-ai-generate]");
   assert(btnAfter !== null, "tombol AI tetap ada setelah request gagal (tidak dihapus dari DOM)");
