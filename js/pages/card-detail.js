@@ -133,6 +133,14 @@ export default {
       return;
     }
 
+    // Phase 25 — router.js sudah set document.title generik ("Ensiklopedia
+    // Tarot — OTR") sebelum modul ini jalan; di sini ditimpa jadi nama kartu
+    // spesifik begitu datanya ada -- ini yang bikin tiap /library/:cardId
+    // (mis. /library/the-fool) benar-benar punya title unik sendiri, bukan
+    // cuma satu title generik untuk 78 kartu (Master Spec §73 menyebut
+    // eksplisit tiap kartu sebagai halaman publik yang bisa diindeks).
+    document.title = `${card.name} — Ensiklopedia Tarot — OTR`;
+
     // Spinner dulu -- listFavoriteEntityIds() bisa network call kalau login
     // (pola sama dengan journal.js/daily.js).
     container.innerHTML = `<div class="row" style="justify-content:center; padding:var(--space-8) 0;"><span class="spinner" aria-label="Memuat"></span></div>`;

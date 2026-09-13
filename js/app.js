@@ -12,37 +12,44 @@ import { getCurrentUser, onAuthStateChange } from "./services/auth-service.js";
 // Phase 24 — PWA
 import { initInstallPrompt } from "./components/install-prompt.js";
 
+// Phase 25 — Performance & Polish (Master Spec §73 SEO): title per-rute
+// ditambahkan sebagai argumen ke-3 registerRoute() supaya document.title
+// (dan title tab browser/history) ikut berubah per halaman -- sebelum ini
+// SELALU "OTR — Orias Tarot Reading" di rute manapun (temuan audit Phase 25).
+// Rute dengan konten dinamis (nama kartu/reading) diberi title generik di
+// sini; page module boleh menimpanya lagi sendiri begitu data konkretnya
+// ada (lihat card-detail.js untuk contoh -- nama kartu spesifik).
 function registerRoutes() {
-  registerRoute("/home", () => import("./pages/home.js"));
-  registerRoute("/reading", () => import("./pages/reading.js"));
-  registerRoute("/result", () => import("./pages/result.js"));
-  registerRoute("/daily", () => import("./pages/daily.js"));
-  registerRoute("/library", () => import("./pages/library.js"));
-  registerRoute("/library/:cardId", () => import("./pages/card-detail.js"));
-  registerRoute("/history", () => import("./pages/history.js"));
-  registerRoute("/history/:readingId", () => import("./pages/history-detail.js"));
-  registerRoute("/journal", () => import("./pages/journal.js"));
-  registerRoute("/statistics", () => import("./pages/statistics.js"));
+  registerRoute("/home", () => import("./pages/home.js"), "Home");
+  registerRoute("/reading", () => import("./pages/reading.js"), "Reading");
+  registerRoute("/result", () => import("./pages/result.js"), "Result");
+  registerRoute("/daily", () => import("./pages/daily.js"), "Daily");
+  registerRoute("/library", () => import("./pages/library.js"), "Library");
+  registerRoute("/library/:cardId", () => import("./pages/card-detail.js"), "Ensiklopedia Tarot");
+  registerRoute("/history", () => import("./pages/history.js"), "History");
+  registerRoute("/history/:readingId", () => import("./pages/history-detail.js"), "Detail Reading");
+  registerRoute("/journal", () => import("./pages/journal.js"), "Journal");
+  registerRoute("/statistics", () => import("./pages/statistics.js"), "Statistics");
   // Phase 20 — Learn Tarot (Roadmap Phase 20, Master Spec §70). Route
   // ":section" opsional lewat dua registerRoute terpisah (pola sama dengan
   // /library + /library/:cardId) -- /learn polos default ke section
   // pertama ("basics"), lihat js/pages/learn.js.
-  registerRoute("/learn", () => import("./pages/learn.js"));
-  registerRoute("/learn/:section", () => import("./pages/learn.js"));
+  registerRoute("/learn", () => import("./pages/learn.js"), "Learn");
+  registerRoute("/learn/:section", () => import("./pages/learn.js"), "Learn");
 
   // Phase 21 — Quiz. "/quiz" polos = pemilihan topik; "/quiz/:topic" =
   // sesi kuis berjalan untuk topik itu.
-  registerRoute("/quiz", () => import("./pages/quiz.js"));
-  registerRoute("/quiz/:topic", () => import("./pages/quiz.js"));
+  registerRoute("/quiz", () => import("./pages/quiz.js"), "Quiz");
+  registerRoute("/quiz/:topic", () => import("./pages/quiz.js"), "Quiz");
 
-  registerRoute("/settings", () => import("./pages/settings.js"));
-  registerRoute("/profile", () => import("./pages/profile.js"));
+  registerRoute("/settings", () => import("./pages/settings.js"), "Settings");
+  registerRoute("/profile", () => import("./pages/profile.js"), "Profile");
   // Phase 19 — Custom Spread (Roadmap Phase 19, Master Spec §69)
-  registerRoute("/custom-spreads", () => import("./pages/custom-spreads.js"));
+  registerRoute("/custom-spreads", () => import("./pages/custom-spreads.js"), "Custom Spread");
   // Phase 13 — Authentication (Master Spec §4 "Authentication routes")
-  registerRoute("/login", () => import("./pages/login.js"));
-  registerRoute("/register", () => import("./pages/register.js"));
-  registerRoute("/forgot-password", () => import("./pages/forgot-password.js"));
+  registerRoute("/login", () => import("./pages/login.js"), "Masuk");
+  registerRoute("/register", () => import("./pages/register.js"), "Daftar");
+  registerRoute("/forgot-password", () => import("./pages/forgot-password.js"), "Lupa Kata Sandi");
 }
 
 /** Terapkan preferensi Reduced Motion yang tersimpan (Phase 8) ke <html>

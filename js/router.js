@@ -10,11 +10,20 @@ import { emit } from "./core/event-bus.js";
 
 const routes = [];
 
+const BASE_TITLE = "OTR — Orias Tarot Reading";
+
 /**
  * @param {string} pattern e.g. "/library/:cardId"
  * @param {() => Promise<{default: {render: Function}}>} loader dynamic import
+ * @param {string} [title] - judul halaman (tanpa suffix " — OTR", ditambahkan
+ *  otomatis di renderCurrentRoute). Opsional -- rute yang tidak mengisi ini
+ *  (mis. rute lama sebelum Phase 25) tetap jalan, cuma document.title jatuh
+ *  balik ke BASE_TITLE generik (perilaku sebelum Phase 25, tidak regresi).
+ *  Untuk rute dengan konten dinamis (mis. /library/:cardId -> nama kartu),
+ *  page module boleh menimpa document.title lagi sendiri SETELAH data-nya
+ *  ada -- lihat card-detail.js.
  */
-export function registerRoute(pattern, loader) {
+export function registerRoute(pattern, loader, title) {
   const paramNames = [];
   const regex = new RegExp(
     "^" +
@@ -30,7 +39,7 @@ export function registerRoute(pattern, loader) {
         .join("/") +
       "$"
   );
-  routes.push({ pattern, regex, paramNames, loader });
+  routes.push({ pattern, regex, paramNames, loader, title });
 }
 
 function parseHash() {
@@ -76,6 +85,7 @@ async function renderCurrentRoute() {
   const pageName = path.split("/")[1] || "home";
   setState({ currentPage: pageName });
   emit("route:change", { path, pageName });
+  document.title = matched.route.title ? `${matched.route.title} — OTR` : BASE_TITLE;
 
   container.classList.add("is-loading");
   try {
@@ -93,6 +103,7 @@ async function renderCurrentRoute() {
 }
 
 function renderNotFound(path) {
+  document.title = `Halaman tidak ditemukan — OTR`;
   container.innerHTML = `
     <div class="empty-state weave">
       <h2>Halaman tidak ditemukan</h2>
@@ -103,6 +114,7 @@ function renderNotFound(path) {
 }
 
 function renderLoadError(path) {
+  document.title = `Gagal memuat halaman — OTR`;
   container.innerHTML = `
     <div class="empty-state">
       <h2>Gagal memuat halaman</h2>
