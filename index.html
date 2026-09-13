@@ -7,6 +7,16 @@
   <meta name="description" content="Orias Tarot Reading — digital tarot journal untuk bertanya, menarik kartu, dan merefleksikan jawabannya." />
   <meta name="theme-color" content="#14111c" />
 
+  <!-- Phase 24 — PWA. `id` di manifest.json disamakan dengan scope supaya
+       browser tidak menganggap update manifest sebagai "app baru" (spec Web
+       App Manifest -- field `id` menentukan identitas PWA lintas update). -->
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+  <!-- iOS Safari tidak konsisten dukung SVG untuk apple-touch-icon -- lihat
+       keterbatasan yang didokumentasikan di icons/icon.svg & PROJECT_STATUS.md
+       Known Issues Phase 24 (butuh PNG raster kalau mau ikon iOS optimal). -->
+  <link rel="apple-touch-icon" href="icons/icon.svg" />
+
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -24,6 +34,7 @@
   <link rel="stylesheet" href="css/daily.css" />
   <link rel="stylesheet" href="css/animations.css" />
   <link rel="stylesheet" href="css/responsive.css" />
+  <link rel="stylesheet" href="css/pwa.css" />
 
   <!-- Phase 12 — Supabase Foundation. Proyek ini tidak pakai bundler (murni
        ES Modules native browser, Master Spec §4), jadi @supabase/supabase-js

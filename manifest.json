@@ -1,0 +1,17 @@
+{
+  "name": "OTR — Orias Tarot Reading",
+  "short_name": "OTR",
+  "description": "Digital tarot journal untuk bertanya, menarik kartu, dan merefleksikan jawabannya.",
+  "start_url": "./#/home",
+  "scope": "./",
+  "id": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "lang": "id",
+  "background_color": "#14111c",
+  "theme_color": "#14111c",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

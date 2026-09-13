@@ -9,6 +9,8 @@ import { initToasts } from "./components/toast.js";
 import { getSettings, syncFromCloud, applyMotionPreference } from "./services/settings-service.js";
 import { setState } from "./core/state.js";
 import { getCurrentUser, onAuthStateChange } from "./services/auth-service.js";
+// Phase 24 — PWA
+import { initInstallPrompt } from "./components/install-prompt.js";
 
 function registerRoutes() {
   registerRoute("/home", () => import("./pages/home.js"));
@@ -118,6 +120,19 @@ function hashHasSupabaseAuthParams() {
   return /access_token=|refresh_token=|type=recovery|error_description=/.test(window.location.hash);
 }
 
+/** Phase 24 — daftarkan service worker (module worker, lihat komentar kepala
+ *  service-worker.js). SENGAJA dibungkus try/catch + `.catch()` terpisah --
+ *  kegagalan di sini (mis. browser tidak dukung, atau di-serve dari
+ *  `file://` saat development lokal tanpa server) TIDAK BOLEH menghentikan
+ *  bootstrap app sama sekali, app harus tetap 100% jalan normal tanpa
+ *  kapabilitas offline/install kalau ini gagal. */
+function registerServiceWorker() {
+  if (!("serviceWorker" in navigator)) return;
+  navigator.serviceWorker
+    .register("./service-worker.js", { type: "module" })
+    .catch((err) => console.warn("[app] gagal mendaftarkan service worker", err));
+}
+
 function main() {
   applyStoredMotionPreference();
 
@@ -127,6 +142,8 @@ function main() {
   registerRoutes();
   initToasts();
   subscribeAuthChanges();
+  registerServiceWorker();
+  initInstallPrompt(root);
 
   if (hashHasSupabaseAuthParams()) {
     // Tunda render pertama SAMPAI Supabase selesai konsumsi token di hash,
