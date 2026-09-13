@@ -51,6 +51,10 @@ create table if not exists user_settings (
 
 alter table user_settings enable row level security;
 
+-- Phase 26 fix: base table privilege — tanpa ini RLS di bawah tidak pernah
+-- sempat dievaluasi (lihat catatan lengkap di 0001_init_schema.sql).
+grant select, insert, update, delete on user_settings to authenticated;
+
 -- ---- user_settings: full CRUD (insert+update dipakai sebagai upsert oleh
 -- settings-service.js), cuma milik sendiri -- sama seperti pola readings/
 -- journals/favorites/daily_cards di 0001_init_schema.sql (§46: "Settings"

@@ -154,6 +154,22 @@ alter table journals enable row level security;
 alter table favorites enable row level security;
 alter table daily_cards enable row level security;
 
+-- ---------------------------------------------------------------------------
+-- Phase 26 fix: base table privileges untuk role `authenticated`/`anon`.
+-- RLS policy di bawah TIDAK cukup tanpa ini — tanpa `grant`, Postgres akan
+-- menolak semua query ke tabel ini dengan "permission denied for table ..."
+-- (code 42501) SEBELUM RLS sempat dievaluasi sama sekali. Bug produksi ini
+-- ditemukan di luar alur roadmap (lihat PROJECT_STATUS Phase 25) untuk
+-- user_settings/daily_cards/favorites di project Supabase yang sudah live —
+-- baris di bawah memastikan proyek Supabase BARU (dari migration ini dari
+-- awal) tidak kena bug yang sama. Scope: semua tabel user-facing di atas.
+-- tarot_cards/spreads/spread_positions (data sistem, read-only publik) juga
+-- perlu select untuk anon supaya guest (belum login) bisa baca katalog kartu.
+-- ---------------------------------------------------------------------------
+
+grant select on tarot_cards, spreads, spread_positions to anon, authenticated;
+grant select, insert, update, delete on profiles, readings, reading_cards, journals, favorites, daily_cards to authenticated;
+
 -- ---- profiles: user cuma bisa akses baris miliknya sendiri ----
 create policy "profiles_select_own" on profiles
   for select using (auth.uid() = id);

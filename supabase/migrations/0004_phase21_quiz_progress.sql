@@ -34,6 +34,10 @@ create table if not exists quiz_progress (
 
 alter table quiz_progress enable row level security;
 
+-- Phase 26 fix: base table privilege (lihat catatan lengkap di
+-- 0001_init_schema.sql) — tanpa ini RLS di bawah tidak pernah dievaluasi.
+grant select, insert, update, delete on quiz_progress to authenticated;
+
 -- Pola sama seperti user_settings/favorites/dst (0001/0003) -- baca/tulis
 -- cuma milik sendiri.
 create policy "quiz_progress_select_own" on quiz_progress
