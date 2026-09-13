@@ -42,7 +42,9 @@ import { getSupabaseClient } from "../integrations/supabase.js";
  *  angka ini dianggap lebih berisiko salah pakai daripada menuliskannya
  *  ulang di sini -- kalau storage.js menambah field settings baru nanti,
  *  DEFAULT_SETTINGS di sini WAJIB ikut diperbarui). */
-const DEFAULT_SETTINGS = { reducedMotion: false };
+// Phase 23 — AI Personalization: tambah `aiPersonalizationOptIn` (default
+// false, sama alasan komentar di core/storage.js).
+const DEFAULT_SETTINGS = { reducedMotion: false, aiPersonalizationOptIn: false };
 
 /** Re-export supaya pemanggil (settings.js) cukup import satu modul ini. */
 export function getSettings() {
@@ -57,7 +59,13 @@ export function applyMotionPreference(settings) {
 }
 
 function mapCloudRow(row) {
-  return { reducedMotion: Boolean(row.reduced_motion) };
+  return {
+    reducedMotion: Boolean(row.reduced_motion),
+    // Phase 23: kolom baru (`supabase/migrations/0005_phase23_ai_personalization.sql`)
+    // -- `?? false` menjaga akun lama (baris dibuat sebelum migration ini
+    // dijalankan) tetap default OFF, bukan `undefined`.
+    aiPersonalizationOptIn: Boolean(row.ai_personalization_opt_in ?? false),
+  };
 }
 
 /**
@@ -83,7 +91,7 @@ export async function syncFromCloud(userId) {
     const cloudSettings = mapCloudRow(data);
     const before = getLocalSettings();
     const merged = saveLocalSettings(cloudSettings);
-    return { settings: merged, changed: before.reducedMotion !== merged.reducedMotion };
+    return { settings: merged, changed: settingsDiffer(before, merged) };
   }
 
   // Belum ada baris cloud sama sekali untuk akun ini -- akun ini "ruang
@@ -94,11 +102,23 @@ export async function syncFromCloud(userId) {
   const merged = saveLocalSettings(DEFAULT_SETTINGS);
   const { error: upsertError } = await supabase
     .from("user_settings")
-    .upsert({ user_id: userId, reduced_motion: Boolean(merged.reducedMotion) });
+    .upsert({
+      user_id: userId,
+      reduced_motion: Boolean(merged.reducedMotion),
+      ai_personalization_opt_in: Boolean(merged.aiPersonalizationOptIn),
+    });
   if (upsertError) {
     console.warn("[settings-service] gagal membuat baris settings cloud awal", upsertError);
   }
-  return { settings: merged, changed: before.reducedMotion !== merged.reducedMotion };
+  return { settings: merged, changed: settingsDiffer(before, merged) };
+}
+
+/** Phase 23 menambah field kedua yang perlu dibandingkan -- diekstrak jadi
+ *  helper supaya syncFromCloud() tidak lupa mem-bandingkan field baru kalau
+ *  ada field ketiga nanti (bug class yang sama seperti alasan DEFAULT_SETTINGS
+ *  dituliskan ulang secara sengaja di atas). */
+function settingsDiffer(a, b) {
+  return a.reducedMotion !== b.reducedMotion || a.aiPersonalizationOptIn !== b.aiPersonalizationOptIn;
 }
 
 /**
@@ -113,7 +133,12 @@ export async function saveSettings(partial, user) {
     const supabase = getSupabaseClient();
     const { error } = await supabase
       .from("user_settings")
-      .upsert({ user_id: user.id, reduced_motion: Boolean(merged.reducedMotion), updated_at: new Date().toISOString() });
+      .upsert({
+        user_id: user.id,
+        reduced_motion: Boolean(merged.reducedMotion),
+        ai_personalization_opt_in: Boolean(merged.aiPersonalizationOptIn),
+        updated_at: new Date().toISOString(),
+      });
     if (error) {
       console.warn("[settings-service] gagal menyinkronkan settings ke cloud", error);
     }

@@ -43,11 +43,18 @@ import { formatDate } from "../core/utils.js";
 // (lihat komentar di masing-masing service). Guest (belum login) berperilaku
 // PERSIS sama seperti sebelumnya -- kedua service fallback ke fungsi
 // core/storage.js yang sama saat state.user null.
-import { saveReading, getReadingById } from "../services/reading-service.js";
-import { getJournalByReadingId, saveJournalEntry } from "../services/journal-service.js";
+import { saveReading, getReadingById, listReadings } from "../services/reading-service.js";
+import { getJournalByReadingId, saveJournalEntry, listJournalEntries } from "../services/journal-service.js";
 // Phase 22 — AI Reading: opsional, di luar flow SAVE -> JOURNAL -> HISTORY
 // di atas -- lihat komentar panel AI di renderResult() untuk alasan gating-nya.
 import { buildAIReadingPayload, getAIReadingSynthesis } from "../services/ai-service.js";
+// Phase 23 — AI Personalization: pure helpers (testable tanpa DOM, lihat
+// scripts/test_phase23_ai_personalization.mjs) yang meringkas 3 sumber data
+// opsional jadi payload.personalization -- lihat komentar dua-lapis opt-in
+// lengkap di js/services/ai-service.js.
+import { summarizePreviousReadings, summarizeFavoriteCategories, extractJournalThemes, buildPersonalizationContext } from "../services/ai-service.js";
+import { listFavoriteEntityIds } from "../services/favorite-service.js";
+import { getSettings } from "../services/settings-service.js";
 
 const CATEGORY_LABELS = {
   general: "Umum",
@@ -76,11 +83,33 @@ function dividerHTML() {
 // Phase 22 — AI Reading (Roadmap Phase 22, Master Spec §66-68)
 // ---------------------------------------------------------------------------
 
-function aiPanelIdleHTML() {
+// Phase 23 — Lapis 2 & 3 dari opt-in personalisasi (lihat komentar lengkap
+// di js/services/ai-service.js). `personalizationAvailable` = Lapis 1
+// (Settings toggle) sedang ON -- kalau OFF, checkbox-checkbox ini TIDAK
+// dirender sama sekali, jadi perilaku panel identik dengan Phase 22.
+function aiPanelIdleHTML(personalizationAvailable) {
   return `
-    <button type="button" class="btn btn--secondary" data-ai-generate>
-      ${icon("star", { size: 16 })} <span data-ai-btn-label>Lihat Interpretasi AI</span>
-    </button>
+    <div class="stack gap-3">
+      ${
+        personalizationAvailable
+          ? `
+        <div class="stack gap-2" style="padding:var(--space-3); border:1px dashed var(--color-border, #ccc); border-radius:var(--radius-md,8px);">
+          <label class="row gap-2" style="align-items:flex-start; cursor:pointer;">
+            <input type="checkbox" data-ai-personalize-checkbox />
+            <span class="text-sm">Sertakan pola dari reading &amp; kategori favorit sebelumnya untuk sintesis yang lebih dalam.</span>
+          </label>
+          <label class="row gap-2" style="align-items:flex-start; cursor:pointer; padding-left:var(--space-5,20px);">
+            <input type="checkbox" data-ai-journal-checkbox disabled />
+            <span class="text-sm text-muted">Sertakan juga tema (kata kunci saja, bukan isi lengkap) dari Journal-ku.</span>
+          </label>
+        </div>
+      `
+          : ""
+      }
+      <button type="button" class="btn btn--secondary" data-ai-generate>
+        ${icon("star", { size: 16 })} <span data-ai-btn-label>Lihat Interpretasi AI</span>
+      </button>
+    </div>
   `;
 }
 
@@ -102,6 +131,14 @@ function aiSynthesisHTML(synthesis) {
       <p class="eyebrow">Reflection</p>
       <p class="text-sm text-muted" style="font-style:italic;">${escapeHTML(synthesis.reflection)}</p>
     </div>
+    ${
+      synthesis.personalizationNote
+        ? `<div class="result-synthesis__block stack gap-2">
+             <p class="eyebrow">Personalisasi <span class="badge">Phase 23</span></p>
+             <p class="text-sm text-muted">${escapeHTML(synthesis.personalizationNote)}</p>
+           </div>`
+        : ""
+    }
   `;
 }
 
@@ -238,6 +275,11 @@ function renderResult(container, reading, { alreadySaved: initialAlreadySaved, e
   // komentar reading-service.js).
   let effectiveReadingId = reading.id;
 
+  // Phase 23 — Lapis 1: dibaca SEKALI di sini (cache lokal, sinkron, sama
+  // pola dengan settings.js) -- tidak berubah selama Result Page ini render,
+  // tidak butuh reaktif ke perubahan Settings di tab lain untuk fase ini.
+  const aiPersonalizationAvailable = Boolean(getSettings().aiPersonalizationOptIn);
+
   container.innerHTML = `
     <section class="result-page stack gap-6">
       <div class="result-header result-section stack gap-3">
@@ -290,7 +332,7 @@ function renderResult(container, reading, { alreadySaved: initialAlreadySaved, e
           <p class="text-sm text-muted">Sintesis tambahan dari AI berdasarkan kartu-kartu di atas — bersifat reflektif untuk direnungkan, bukan ramalan pasti.</p>
         </div>
         <div class="result-synthesis__block" data-ai-body>
-          ${aiPanelIdleHTML()}
+          ${aiPanelIdleHTML(aiPersonalizationAvailable)}
         </div>
       </div>
 
@@ -379,6 +421,20 @@ function renderResult(container, reading, { alreadySaved: initialAlreadySaved, e
   // jadi bisa dilihat kapan saja begitu reading selesai, sama seperti
   // Overall Theme/Key Message/Reflection lokal di atasnya.
   const aiBody = container.querySelector("[data-ai-body]");
+
+  // Phase 23 — Lapis 3: checkbox Journal hanya bisa dicentang kalau Lapis 2
+  // (checkbox personalisasi umum) sudah dicentang lebih dulu -- mencentang
+  // personalisasi umum TIDAK otomatis mencentang Journal (harus manual
+  // keduanya), tapi mematikan personalisasi umum otomatis mematikan &
+  // mengunci Journal lagi (tidak boleh ada state "Journal ON, umum OFF").
+  const personalizeCheckbox = aiBody?.querySelector("[data-ai-personalize-checkbox]");
+  const journalCheckbox = aiBody?.querySelector("[data-ai-journal-checkbox]");
+  personalizeCheckbox?.addEventListener("change", (e) => {
+    if (!journalCheckbox) return;
+    journalCheckbox.disabled = !e.target.checked;
+    if (!e.target.checked) journalCheckbox.checked = false;
+  });
+
   aiBody?.addEventListener("click", async (e) => {
     const btn = e.target.closest("[data-ai-generate]");
     if (!btn || btn.disabled) return;
@@ -388,10 +444,30 @@ function renderResult(container, reading, { alreadySaved: initialAlreadySaved, e
     if (label) label.textContent = "Menyusun interpretasi...";
 
     try {
+      // Phase 23 — hanya kumpulkan data personalisasi kalau checkbox Lapis 2
+      // (dan/atau Lapis 3) benar-benar dicentang SAAT tombol ini diklik --
+      // bukan cuma karena Lapis 1 (Settings) ON. Ini yang membuat
+      // personalisasi "per reading, per klik", bukan otomatis.
+      let personalization = null;
+      if (personalizeCheckbox?.checked) {
+        const wantsJournal = Boolean(journalCheckbox?.checked);
+        const [previousReadingsRaw, favoriteCardIds, journalEntriesRaw] = await Promise.all([
+          listReadings().catch(() => []),
+          listFavoriteEntityIds("card").catch(() => []),
+          wantsJournal ? listJournalEntries().catch(() => []) : Promise.resolve([]),
+        ]);
+        personalization = buildPersonalizationContext({
+          previousReadings: summarizePreviousReadings(previousReadingsRaw, effectiveReadingId),
+          favoriteCategories: summarizeFavoriteCategories(favoriteCardIds, getCardById),
+          journalThemes: wantsJournal ? extractJournalThemes(journalEntriesRaw) : [],
+        });
+      }
+
       const payload = buildAIReadingPayload({
         question: reading.question ?? "",
         spread,
         entries: validEntries,
+        personalization,
       });
       const synthesis = await getAIReadingSynthesis(payload);
       aiBody.innerHTML = aiSynthesisHTML(synthesis);

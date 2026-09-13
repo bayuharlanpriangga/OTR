@@ -106,6 +106,18 @@ function template(settings, user) {
           <span class="badge">Segera</span>
         </div>
       </div>
+
+      <div class="card stack gap-4">
+        <div class="row" style="justify-content:space-between;">
+          <div class="stack gap-1" style="max-width:36ch;">
+            <h3>Personalisasi AI <span class="badge">Opsional</span></h3>
+            <p class="text-sm text-muted">Izinkan AI Reading menawarkan sintesis lebih dalam berdasarkan reading &amp; kategori favoritmu sebelumnya. Ini HANYA membuka opsinya — kamu tetap harus mencentang secara terpisah di setiap halaman Result kapan pun mau dipakai. Journal tidak pernah disertakan kecuali kamu mencentang izin tambahan itu juga, per reading.</p>
+          </div>
+          <label style="display:inline-flex; align-items:center; gap:var(--space-2); cursor:pointer;">
+            <input type="checkbox" data-ai-personalization-toggle ${settings.aiPersonalizationOptIn ? "checked" : ""} />
+          </label>
+        </div>
+      </div>
     </section>
   `;
 }
@@ -146,6 +158,24 @@ export default {
       showToast(checked ? "Reduced motion diaktifkan." : "Reduced motion dimatikan.", "default");
     });
 
+    // Phase 23 — AI Personalization: toggle ini TIDAK memicu apa pun secara
+    // otomatis (tidak ada network call ke AI di sini) -- cuma menentukan
+    // apakah checkbox lapis-kedua muncul nanti di Result Page
+    // (js/pages/result.js). Konsisten dengan constraint Roadmap "must
+    // explicitly opt in": mengaktifkan toggle ini SENDIRIAN tidak membuat
+    // reading manapun otomatis dipersonalisasi.
+    const aiToggle = container.querySelector("[data-ai-personalization-toggle]");
+    aiToggle?.addEventListener("change", async (e) => {
+      const checked = e.target.checked;
+      await saveSettings({ aiPersonalizationOptIn: checked }, getState().user);
+      showToast(
+        checked
+          ? "Personalisasi AI diaktifkan. Kamu masih perlu mencentangnya per reading di halaman Result."
+          : "Personalisasi AI dimatikan.",
+        "default"
+      );
+    });
+
     // Phase 14: kalau user login, tarik/upload settings cloud DI BELAKANG
     // paint pertama (bukan memblokirnya) -- kalau ternyata nilainya beda
     // dari cache lokal (mis. diubah dari device lain), toggle & motion
@@ -157,6 +187,7 @@ export default {
           if (!changed) return;
           applyMotionPreference(synced);
           if (toggle) toggle.checked = Boolean(synced.reducedMotion);
+          if (aiToggle) aiToggle.checked = Boolean(synced.aiPersonalizationOptIn);
         })
         .catch((err) => {
           console.warn("[settings] gagal menyinkronkan settings dari cloud", err);

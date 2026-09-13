@@ -29,6 +29,143 @@ import { getSupabaseClient } from "../integrations/supabase.js";
 
 const FUNCTION_NAME = "ai-reading-synthesis";
 
+// ---------------------------------------------------------------------------
+// Phase 23 — AI Personalization (Roadmap Phase 23, DONE WHEN tidak eksplisit
+// di Roadmap -- definisi "selesai" di bawah ini keputusan sesi ini sendiri,
+// PERLU dikonfirmasi ke Orias, lihat PROJECT_STATUS.md).
+//
+// Dua constraint Roadmap yang ditulis TEBAL:
+//   1. "User must explicitly opt in"
+//   2. "Do not automatically analyze private journal content"
+//
+// Desain dua-lapis opt-in yang dipakai untuk memenuhi constraint #1:
+//   Lapis 1 (Settings, per-akun/device, js/pages/settings.js):
+//     settings.aiPersonalizationOptIn -- toggle "boleh DITAWARI", default
+//     OFF. TIDAK men-generate apa pun sendirian.
+//   Lapis 2 (Result Page, PER READING, js/pages/result.js):
+//     hanya muncul kalau Lapis 1 ON. Checkbox "Sertakan pola reading &
+//     favorit sebelumnya" -- harus dicentang ulang setiap kali user mau
+//     personalisasi dipakai (tidak "sekali klik selamanya").
+//
+// Constraint #2 (Journal) dipenuhi dengan gerbang KETIGA yang lebih ketat:
+//   - Checkbox terpisah "Sertakan tema dari Journal-ku", hanya muncul kalau
+//     Lapis 2 sudah dicentang, dan HARUS dicentang ulang per reading juga.
+//   - Bahkan kalau dicentang, TEKS JOURNAL MENTAH TIDAK PERNAH dikirim kemana
+//     pun -- extractJournalThemes() di bawah cuma menghasilkan daftar kata
+//     kunci frekuensi-tinggi (bukan kalimat, bukan konteks), dihitung 100%
+//     di klien. Ini keputusan scope yang lebih ketat dari yang diwajibkan
+//     Roadmap secara harfiah (Roadmap cuma bilang "jangan otomatis", tidak
+//     melarang analisis manual) -- diambil karena "Journal Themes" di
+//     Roadmap Potential Inputs tidak mendefinisikan representasi konkretnya,
+//     dan mengirim ringkasan kata kunci jauh lebih aman secara privasi
+//     daripada mengirim cuplikan/teks penuh journal ke Edge Function pihak
+//     ketiga (Gemini). PERLU dikonfirmasi ke Orias apakah representasi ini
+//     cukup "deep" untuk maksud "deeper synthesis" Roadmap.
+// ---------------------------------------------------------------------------
+
+const MAX_PREVIOUS_READINGS = 5;
+const MAX_FAVORITE_CATEGORIES = 5;
+const MAX_JOURNAL_THEMES = 8;
+
+const CATEGORY_LABELS = {
+  major: "Major Arcana",
+  wands: "Wands",
+  cups: "Cups",
+  swords: "Swords",
+  pentacles: "Pentacles",
+};
+
+/** Kata umum Bahasa Indonesia yang dibuang sebelum menghitung frekuensi kata
+ *  di journal -- daftar sengaja pendek/kasar (bukan library stopword penuh),
+ *  cukup untuk menyaring kata sambung paling umum supaya "tema" yang keluar
+ *  bermakna, bukan daftar "yang/dan/saya". */
+const STOPWORDS = new Set([
+  "yang", "dan", "di", "ke", "dari", "untuk", "dengan", "ini", "itu", "saya",
+  "aku", "kamu", "dia", "mereka", "kita", "kami", "akan", "sudah", "belum",
+  "tidak", "juga", "atau", "karena", "kalau", "jadi", "ada", "adalah",
+  "saat", "waktu", "hari", "tapi", "sangat", "lebih", "masih", "bisa",
+  "harus", "seperti", "banyak", "sama", "dalam", "pada", "oleh", "para",
+]);
+
+/**
+ * Ekstraksi tema journal sangat sederhana & murni klien -- lihat catatan
+ * privasi di atas file ini. TIDAK PERNAH mengembalikan kalimat/cuplikan asli,
+ * hanya kata-kata individual yang paling sering muncul lintas entri.
+ * @param {Array<{content:string}>} entries
+ * @param {number} [max]
+ * @returns {string[]}
+ */
+export function extractJournalThemes(entries = [], max = MAX_JOURNAL_THEMES) {
+  const freq = new Map();
+  for (const entry of entries) {
+    const words = String(entry?.content ?? "")
+      .toLowerCase()
+      .replace(/[^a-zà-ÿ0-9\s]/gi, " ")
+      .split(/\s+/)
+      .filter((w) => w.length >= 4 && !STOPWORDS.has(w));
+    for (const w of words) {
+      freq.set(w, (freq.get(w) ?? 0) + 1);
+    }
+  }
+  return [...freq.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, max)
+    .map(([word]) => word);
+}
+
+/**
+ * @param {Array<{spreadName?:string, synthesisSnapshot?:{theme?:string}, createdAt?:string, id?:string}>} readings
+ * @param {string} [excludeId] - reading yang sedang dibuka, jangan dianggap "sebelumnya"
+ * @param {number} [max]
+ * @returns {Array<{spread:string, theme:string, createdAt:string}>}
+ */
+export function summarizePreviousReadings(readings = [], excludeId = null, max = MAX_PREVIOUS_READINGS) {
+  return readings
+    .filter((r) => r?.id !== excludeId && r?.status !== "in_progress")
+    .slice(0, max)
+    .map((r) => ({
+      spread: r.spreadName ?? "",
+      theme: r.synthesisSnapshot?.theme ?? "",
+      createdAt: r.createdAt ?? "",
+    }))
+    .filter((r) => r.spread && r.theme);
+}
+
+/**
+ * @param {string[]} favoriteCardIds
+ * @param {(id:string) => {arcana?:string, suit?:string}|null} getCardById
+ * @param {number} [max]
+ * @returns {string[]} label kategori, terurut dari paling sering
+ */
+export function summarizeFavoriteCategories(favoriteCardIds = [], getCardById, max = MAX_FAVORITE_CATEGORIES) {
+  const freq = new Map();
+  for (const id of favoriteCardIds) {
+    const card = getCardById?.(id);
+    if (!card) continue;
+    const key = card.arcana === "major" ? "major" : (card.suit ?? null);
+    if (!key || !CATEGORY_LABELS[key]) continue;
+    freq.set(key, (freq.get(key) ?? 0) + 1);
+  }
+  return [...freq.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, max)
+    .map(([key]) => CATEGORY_LABELS[key]);
+}
+
+/**
+ * Gabungkan tiga sumber opsional jadi satu object `personalization` siap
+ * ditempel ke payload -- mengembalikan `null` kalau semuanya kosong (supaya
+ * pemanggil tidak mengirim object personalization kosong yang tidak berguna).
+ * @param {{previousReadings?:Array, favoriteCategories?:string[], journalThemes?:string[]}} parts
+ * @returns {{previousReadings:Array, favoriteCategories:string[], journalThemes:string[]}|null}
+ */
+export function buildPersonalizationContext({ previousReadings = [], favoriteCategories = [], journalThemes = [] } = {}) {
+  if (previousReadings.length === 0 && favoriteCategories.length === 0 && journalThemes.length === 0) {
+    return null;
+  }
+  return { previousReadings, favoriteCategories, journalThemes };
+}
+
 /**
  * Menyusun payload sesuai Master Spec §67 "AI input" dari data yang SUDAH
  * ada di Result Page (js/pages/result.js) -- tidak menghitung ulang apa pun,
@@ -40,9 +177,14 @@ const FUNCTION_NAME = "ai-reading-synthesis";
  * @param {string} [params.question]
  * @param {{name:string}} params.spread
  * @param {Array<{entry:{orientation:string}, position:{name:string}, card:{name:string}, interpretation:{meaning:string}}>} params.entries
- * @returns {{question:string, spread:string, cards:Array<{position:string,card:string,orientation:string,meaning:string}>}}
+ * @param {{previousReadings:Array, favoriteCategories:string[], journalThemes:string[]}|null} [params.personalization]
+ *   Phase 23 -- hasil buildPersonalizationContext(), atau `null`/tidak diisi
+ *   sama sekali kalau user tidak opt-in (lihat catatan dua-lapis opt-in di
+ *   atas file ini). Field ini SENGAJA opsional & default tidak ada --
+ *   perilaku tanpa argumen ini harus identik 100% dengan Phase 22.
+ * @returns {{question:string, spread:string, cards:Array<{position:string,card:string,orientation:string,meaning:string}>, personalization?:object}}
  */
-export function buildAIReadingPayload({ question = "", spread, entries }) {
+export function buildAIReadingPayload({ question = "", spread, entries, personalization = null }) {
   if (!spread?.name) {
     throw new Error("[ai-service] buildAIReadingPayload() butuh spread yang valid.");
   }
@@ -50,7 +192,7 @@ export function buildAIReadingPayload({ question = "", spread, entries }) {
     throw new Error("[ai-service] buildAIReadingPayload() butuh minimal 1 entry kartu.");
   }
 
-  return {
+  const payload = {
     question: question || "",
     spread: spread.name,
     cards: entries.map(({ entry, position, card, interpretation }) => ({
@@ -60,6 +202,16 @@ export function buildAIReadingPayload({ question = "", spread, entries }) {
       meaning: interpretation?.meaning ?? "",
     })),
   };
+
+  // Hanya tempel key `personalization` kalau beneran ada isinya -- payload
+  // Phase 22 (tanpa opt-in) TIDAK BOLEH punya key ini sama sekali, supaya
+  // validatePayload() di Edge Function bisa membedakan "user tidak opt-in"
+  // dari "user opt-in tapi kebetulan semua sumber kosong".
+  if (personalization) {
+    payload.personalization = personalization;
+  }
+
+  return payload;
 }
 
 /** Reshape respons Edge Function (snake_case, Master Spec §67 "AI output")
@@ -69,12 +221,19 @@ function mapSynthesisResponse(data) {
   if (!data || typeof data !== "object") {
     throw new Error("Respons AI tidak valid.");
   }
-  const { theme, summary, key_message: keyMessage, reflection } = data;
+  const { theme, summary, key_message: keyMessage, reflection, personalization_note: personalizationNote } = data;
   const allValid = [theme, summary, keyMessage, reflection].every((v) => typeof v === "string" && v.trim());
   if (!allValid) {
     throw new Error("Respons AI tidak lengkap.");
   }
-  return { theme, summary, keyMessage, reflection };
+  // Phase 23: personalization_note cuma ada kalau request-nya menyertakan
+  // `personalization` (lihat prompt.js validateSynthesis) -- opsional di
+  // sisi klien juga, ditampilkan result.js kalau ada.
+  const result = { theme, summary, keyMessage, reflection };
+  if (typeof personalizationNote === "string" && personalizationNote.trim()) {
+    result.personalizationNote = personalizationNote.trim();
+  }
+  return result;
 }
 
 /**

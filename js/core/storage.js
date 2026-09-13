@@ -86,6 +86,15 @@ export const STORAGE_KEYS = {
 
 const DEFAULT_SETTINGS = {
   reducedMotion: false,
+  // Phase 23 — AI Personalization (Roadmap Phase 23). Default WAJIB false --
+  // Roadmap menulis tebal "User must explicitly opt in". Toggle ini adalah
+  // gerbang LAPIS PERTAMA (per-akun/device, Settings) -- lapis KEDUA adalah
+  // checkbox per-reading di Result Page (js/pages/result.js) yang cuma
+  // muncul kalau toggle ini ON. Dua lapis ini SENGAJA terpisah: toggle di
+  // sini cuma menyatakan "saya boleh DITAWARI personalisasi", bukan "setiap
+  // reading harus dipersonalisasi" -- lihat komentar lengkap di
+  // js/services/ai-service.js.
+  aiPersonalizationOptIn: false,
 };
 
 // ---- Guest Readings ----
